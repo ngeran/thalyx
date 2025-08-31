@@ -1,0 +1,71 @@
+version: "1.0"
+metadata:
+  theme: "default"
+  responsive: true
+items:
+  - id: "home"
+    label: "Home"
+    url: "/"
+    icon: "home"
+
+  - id: "dashboard"
+    label: "Dashboard"
+    url: "/dashboard"
+    icon: "dashboard"
+    children:
+      - id: "analytics"
+        label: "Analytics"
+        url: "/dashboard/analytics"
+        icon: "chart"
+      - id: "reports"
+        label: "Reports"
+        url: "/dashboard/reports"
+        icon: "report"
+
+  - id: "devices"
+    label: "Devices"
+    url: "/devices"
+    icon: "device"
+    metadata:
+      permission: "devices.read"
+    children:
+      - id: "device-list"
+        label: "All Devices"
+        url: "/devices"
+      - id: "device-groups"
+        label: "Device Groups"
+        url: "/devices/groups"
+      - id: "device-monitoring"
+        label: "Monitoring"
+        url: "/devices/monitoring"
+
+  - id: "lab"
+    label: "Lab Management"
+    url: "/lab"
+    icon: "lab"
+    metadata:
+      permission: "lab.access"
+    children:
+      - id: "experiments"
+        label: "Experiments"
+        url: "/lab/experiments"
+      - id: "protocols"
+        label: "Protocols"
+        url: "/lab/protocols"
+      - id: "samples"
+        label: "Samples"
+        url: "/lab/samples"
+
+  - id: "settings"
+    label: "Settings"
+    url: "/settings"
+    icon: "settings"
+    children:
+      - id: "user-settings"
+        label: "User Preferences"
+        url: "/settings/user"
+      - id: "system-settings"
+        label: "System"
+        url: "/settings/system"
+        metadata:
+          permission: "admin"
