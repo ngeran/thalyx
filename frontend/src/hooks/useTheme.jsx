@@ -23,7 +23,9 @@ export const ThemeProvider = ({ children }) => {
   };
 
   const setTheme = (newTheme) => {
-    setThemeState(newTheme);
+    if (['light', 'dark'].includes(newTheme)) {
+      setThemeState(newTheme);
+    }
   };
 
   return (

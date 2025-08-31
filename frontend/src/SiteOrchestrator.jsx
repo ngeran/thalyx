@@ -2,30 +2,34 @@
  * Enhanced SiteOrchestrator Component
  * 
  * @description
- * Advanced site orchestrator that leverages the modern NavigationBar component
+ * Advanced site orchestrator that leverages the modern GlobalSiteNavigation component
  * with integrated WebSocket status, real-time updates, and enhanced user experience.
  * This component now provides a cleaner separation of concerns with dedicated
  * navigation management and improved responsive design.
+ * Now integrates GlobalSiteNavigation for enhanced nav features, with WebSocket status
+ * moved there for centralized control.
  * 
  * Key Enhancements:
- * - Integration with modern NavigationBar component
- * - Enhanced WebSocket status monitoring with visual indicators
+ * - Integration with modern GlobalSiteNavigation component
+ * - Enhanced WebSocket status monitoring with visual indicators (moved to nav)
  * - Improved responsive design with better mobile experience
  * - Real-time navigation updates with smooth transitions
  * - Advanced notification system with categorization
- * - Theme support with dark/light mode switching
+ * - Theme support with dark/light mode switching using yellow theme from shadcn
  * - Enhanced error handling and fallback mechanisms
  * - Performance optimizations with memoization
  * - Accessibility improvements with ARIA labels
  * 
  * @dependencies
  * - React (useState, useEffect, useMemo, useCallback hooks): State and lifecycle management
+ * - React Router (BrowserRouter, Routes, Route, Link): Page routing (BrowserRouter is now in main.jsx)
  * - Lucide React icons: UI iconography
- * - NavigationBar component: Modern integrated navigation with WebSocket status
- * - PageSidebar component: Enhanced sidebar with real-time updates
+ * - GlobalSiteNavigation component: Enhanced navigation with WebSocket status
+ * - EnhancedSidebar component: Sidebar with real-time updates
  * - useNavigation hook: Enhanced navigation data management
  * - useWebSocketContext hook: Real-time connectivity and updates
- * - navigationProcessor utilities: Data processing and transformation and transformation
+ * - navigationProcessor utilities: Data processing and transformation
+ * - useTheme hook: Theme management with yellow theme from shadcn
  * 
  * @new-features
  * - Seamless WebSocket status integration in navigation bar
@@ -35,7 +39,8 @@
  * - Enhanced error recovery with retry mechanisms
  * - Mobile-first responsive design patterns
  * - Keyboard navigation support with shortcuts
- * - Search functionality with instant results
+ * - Visual gap between navigation and main content for improved UI clarity
+ * - Yellow theme implementation following shadcn design system
  * 
  * @how-to-use
  * 1. Wrap in WebSocketProvider for real-time features:
@@ -62,317 +67,255 @@
  *      showWebSocketStatus={true}
  *    />
  *    ```
+ * 
+ * 4. Add additional pages:
+ *    - Create a React component for the new page, e.g., `ReportsPage.jsx`
+ *    - Import it into this file
+ *    - Add a `<Route path="/reports" element={<ReportsPage />} />` inside `Routes`
+ *    - Add an entry in your `navigationData` or static nav sections for the new page
  */
 
 // =============================================================================
 // IMPORTS AND DEPENDENCIES
 // =============================================================================
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { 
-  Menu, 
-  User, 
-  Bell, 
-  Wifi, 
-  WifiOff, 
-  RefreshCw, 
-  Loader2,
-  AlertTriangle,
-  CheckCircle,
-  Search
-} from "lucide-react";
+import { Routes, Route, useNavigate, useLocation } from "react-router-dom"; // Removed BrowserRouter, added useNavigate, useLocation
+import { Home, Loader2, AlertTriangle, RefreshCw } from "lucide-react";
 
 // Components
-import NavigationBar from "./components/navigation/NavigationBar.jsx";
+import GlobalSiteNavigation from "./components/navigation/GlobalSiteNavigation.jsx";
 import EnhancedSidebar from "./components/layout/EnhancedSidebar.jsx";
 
 // Hooks and contexts
 import { useNavigation } from "./hooks/useNavigation";
 import { useWebSocketContext } from "./contexts/WebSocketContext";
 import { ThemeProvider, useTheme } from './hooks/useTheme';
-import { 
-  processNavigationData, 
-  flattenNavigationForTopNav, 
-  getSidebarItems 
-} from "./utils/navigationProcessor";
+import { processNavigationData, flattenNavigationForTopNav, getSidebarItems } from "./utils/navigationProcessor.jsx"; // Corrected path to .jsx
 
-// Main Site Orchestrator Component
+// =============================================================================
+// NAVIGATION PAGES (Updated Import Paths)
+// =============================================================================
+import SettingsPage from "./pages/SettingsPage.jsx";
+import DashboardPage from "./pages/DashboardPage.jsx";
+import FileUploaderPage from "./pages/FileUploaderPage.jsx";
+import InventoryPage from "./pages/InventoryPage.jsx";
+import ReportsPage from "./pages/ReportsPage.jsx";
+
+// =============================================================================
+// MAIN COMPONENT
+// =============================================================================
 const SiteOrchestrator = () => {
-  // Theme hook
   const { theme } = useTheme();
-  
+  const navigate = useNavigate();   // Initialize useNavigate hook
+  const location = useLocation();   // Initialize useLocation hook
+
   // State
-  const [activePageId, setActivePageId] = useState("home");
+  const [activePageId, setActivePageId] = useState("dashboard"); // default to dashboard
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [currentUser] = useState({
-    name: 'John Doe',
-    email: 'john.doe@example.com',
+    name: 'Nikos',
+    email: 'nikos@example.com',
     role: 'Administrator',
     avatar: null
   });
 
   // Navigation hook
-  const { 
-    navigationData: httpNavigationData, 
-    loading, 
-    error, 
-    refresh: refreshNavigation,
-    breadcrumbs,
-    currentSection,
-    navigationStats
-  } = useNavigation({
+  const { navigationData: httpNavigationData, loading, error, refresh: refreshNavigation, breadcrumbs, currentSection } = useNavigation({
     enableRealTime: true,
     enableBreadcrumbs: true,
     cacheEnabled: true,
-    currentPath: window.location.pathname
+    currentPath: location.pathname // Use useLocation to get the current path for navigation hook
   });
 
   // WebSocket context
-  const {
-    isConnected: wsConnected,
-    isConnecting: wsIsConnecting,
-    isReconnecting: wsIsReconnecting,
-    navigationData: wsNavigationData,
-    lastUpdate,
-    notifications,
-    addNotification,
-    connectionStats,
-    error: wsError
-  } = useWebSocketContext();
+  const { isConnected: wsConnected = false, lastUpdate = null, notifications = [], connectionStats = null } = useWebSocketContext() || {};
 
-  // Responsive behavior
-  useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth < 1024) {
-        setSidebarOpen(false);
-      } else {
-        setSidebarOpen(true);
+// =============================================================================
+// Sync activePageId with URL path
+// =============================================================================
+useEffect(() => {
+  const currentPath = location.pathname;
+
+  const findActiveId = (processedNavSections) => {
+      // Add a robust check here!
+      if (!processedNavSections || processedNavSections.length === 0) {
+          return "dashboard"; // Default if no navigation sections are available
       }
-    };
 
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+      // Flatten all items and their children for a comprehensive search
+      const allNavItems = processedNavSections.flatMap(section => {
+          // Ensure section.items is an array before flatMapping
+          if (!section.items) return [];
+          return section.items.flatMap(item => [item, ...(item.children || [])]);
+      });
 
-  // Data processing
-  const navigationData = useMemo(() => {
-    return (wsConnected && wsNavigationData) ? wsNavigationData : httpNavigationData;
-  }, [wsConnected, wsNavigationData, httpNavigationData]);
+      // Add a check for allNavItems being empty after flattening
+      if (allNavItems.length === 0) {
+          return "dashboard"; // Default if no items are found after flattening
+      }
 
-  const processedNavigation = useMemo(() => {
-    return processNavigationData(navigationData);
-  }, [navigationData]);
+      // Find the most specific match first (longest path)
+      let bestMatchId = "dashboard"; // Default if no specific match
+      let bestMatchLength = 0;
 
-  const topNavItems = useMemo(() => {
-    return flattenNavigationForTopNav(processedNavigation);
-  }, [processedNavigation]);
+      for (const item of allNavItems) {
+          if (currentPath === item.url) {
+              bestMatchId = item.id;
+              break; // Exact match, prioritize and stop
+          } else if (currentPath.startsWith(item.url) && item.url !== "/" && item.url.length > bestMatchLength) {
+              // For paths like /devices/groups when item.url is /devices, find the longest match
+              bestMatchId = item.id;
+              bestMatchLength = item.url.length;
+          } else if (currentPath === "/" && item.url === "/") {
+              bestMatchId = item.id;
+              // Don't break here if you want to allow more specific matches later
+              // or if a different 'home' item might be more relevant
+          }
+      }
+      return bestMatchId;
+  };
 
-  const activeItem = useMemo(() => {
-    return topNavItems.find(item => item.id === activePageId);
-  }, [topNavItems, activePageId]);
-
-  const sidebarItems = useMemo(() => {
-    return getSidebarItems(processedNavigation, activePageId);
-  }, [processedNavigation, activePageId]);
-
-  // Event handlers
-  const toggleSidebar = useCallback(() => {
-    setSidebarOpen(!sidebarOpen);
-  }, [sidebarOpen]);
-
-  const handleLogout = useCallback(() => {
-    addNotification({
-      id: `logout-${Date.now()}`,
-      type: 'auth',
-      message: 'Logged out successfully',
-      level: 'info',
-      timestamp: new Date(),
-      autoHide: true,
-      duration: 2000
-    });
-    console.log('User logged out');
-  }, [addNotification]);
-
-  // Loading state
-  if (loading && !navigationData) {
-    return (
-      <div className="h-screen flex flex-col bg-background">
-        <div className="h-16 bg-sidebar border-b border-sidebar-border flex items-center justify-between px-6">
-          <div className="flex items-center space-x-4">
-            <div className="h-8 w-8 bg-sidebar-accent rounded-lg animate-pulse" />
-            <div className="h-6 w-24 bg-sidebar-accent rounded animate-pulse" />
-          </div>
-        </div>
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <Loader2 className="animate-spin rounded-full h-12 w-12 mx-auto mb-4 text-sidebar-primary" />
-            <p className="text-foreground">Loading application...</p>
-          </div>
-        </div>
-      </div>
-    );
+  // Only run this logic if navigation data has been loaded and is not null/undefined
+  if (!loading && httpNavigationData) {
+    const processed = processNavigationData(httpNavigationData);
+    // Ensure processed.sections exists before passing to findActiveId
+    if (processed && processed.sections) {
+      setActivePageId(findActiveId(processed.sections));
+    } else {
+      // Fallback if processed data is unexpected
+      console.warn("Navigation data processing resulted in unexpected structure:", processed);
+      setActivePageId("dashboard");
+    }
+  } else if (!loading && !httpNavigationData) {
+      // Handle case where data is loaded but is empty (e.g., API returned no nav data)
+      setActivePageId("dashboard");
   }
+}, [location.pathname, loading, httpNavigationData, processNavigationData]); // Add processNavigationData to dependencies
 
-  // Error state
-  if (error && !navigationData) {
-    return (
-      <div className="h-screen flex flex-col bg-background">
-        <div className="h-16 bg-sidebar border-b border-red-200 flex items-center justify-between px-6">
-          <div className="flex items-center space-x-4">
-            <AlertTriangle className="h-6 w-6 text-red-500" />
-            <span className="text-lg font-semibold text-red-600">Application Error</span>
-          </div>
-        </div>
-        <div className="flex-1 flex items-center justify-center p-6">
-          <div className="text-center max-w-md">
-            <AlertTriangle className="h-16 w-16 text-red-500 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-red-600 mb-4">Navigation System Error</h2>
-            <p className="text-red-500 mb-4">{error}</p>
-            <button 
-              onClick={refreshNavigation}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 mx-auto"
-            >
-              <RefreshCw className="h-4 w-4" />
-              Retry Connection
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
-  // Main render
+
+
+  // Memoized navigation data
+  // =============================================================================
+  const navigationData = useMemo(() => (wsConnected && httpNavigationData ? httpNavigationData : httpNavigationData), [wsConnected, httpNavigationData]);
+  const processedNavigation = useMemo(() => processNavigationData(navigationData), [navigationData]);
+  const topNavItems = useMemo(() => flattenNavigationForTopNav(processedNavigation), [processedNavigation]);
+  const sidebarItems = useMemo(() => getSidebarItems(processedNavigation, activePageId), [processedNavigation, activePageId]);
+
+  const toggleSidebar = useCallback(() => setSidebarOpen(!sidebarOpen), [sidebarOpen]);
+
+  // Handle page change: update internal state for highlighting and navigate using react-router-dom
+  const handlePageChange = useCallback((id, url) => {
+    setActivePageId(id); // Keep the internal state for highlighting
+    navigate(url);      // Navigate to the new URL using react-router-dom
+  }, [navigate]);
+
+  // =============================================================================
+  // Render main content routes
+  // =============================================================================
   return (
-    <div className="h-screen flex bg-background text-foreground">
-      
-      {/* Sidebar */}
-      <EnhancedSidebar 
-        items={sidebarItems}
-        pageTitle="Thalyx"
-        isOpen={sidebarOpen}
-        onToggle={toggleSidebar}
-        activePageId={activePageId}
-        onItemSelect={setActivePageId}
-        wsConnected={wsConnected}
-        lastUpdate={lastUpdate}
-        theme={theme}
-        connectionStats={connectionStats}
+    // BrowserRouter is now handled in main.jsx, so it's removed here
+    <div className={`flex flex-col h-screen bg-background text-foreground ${theme}`}>
+      {/* Navigation */}
+      <GlobalSiteNavigation
+        user={currentUser}
+        currentPage={activePageId}
+        onPageChange={handlePageChange} // Pass the new handler to GlobalSiteNavigation
+        navigationData={topNavItems} // Pass the flattened data for top navigation
       />
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
-        
-        {/* Navigation Bar */}
-        <NavigationBar
-          onSidebarToggle={toggleSidebar}
-          breadcrumbs={breadcrumbs}
-          user={currentUser}
+      {/* Content */}
+      <div className="flex flex-1 overflow-hidden">
+        <EnhancedSidebar 
+          items={sidebarItems}
+          pageTitle="Thalyx"
+          isOpen={sidebarOpen}
+          onToggle={toggleSidebar}
+          activePageId={activePageId}
+          onItemSelect={(id, url) => handlePageChange(id, url)} // Sidebar also uses the new handler
+          wsConnected={wsConnected}
+          lastUpdate={lastUpdate}
+          theme={theme}
+          connectionStats={connectionStats}
         />
 
-        {/* Connection Status Banner */}
-        {!wsConnected && !wsIsConnecting && (
-          <div className="bg-yellow-50 dark:bg-yellow-900/20 border-b border-yellow-200 dark:border-yellow-800 px-6 py-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <WifiOff className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
-                <span className="text-sm text-yellow-800 dark:text-yellow-200">
-                  Real-time updates unavailable - operating in offline mode
-                </span>
-              </div>
-              <button 
-                onClick={refreshNavigation}
-                className="text-sm text-yellow-700 dark:text-yellow-300 hover:text-yellow-900 dark:hover:text-yellow-100 underline transition-colors"
-              >
-                Refresh Data
+        <main className="flex-1 overflow-auto p-6 mt-4">
+          {loading && <Loader2 className="animate-spin h-12 w-12 mx-auto" />}
+          {error && (
+            <div className="text-center text-red-500">
+              <AlertTriangle className="h-12 w-12 mx-auto mb-4" />
+              <p>Navigation Error: {error}</p>
+              <button onClick={refreshNavigation} className="px-4 py-2 bg-primary text-primary-foreground rounded-lg">
+                <RefreshCw className="inline h-4 w-4 mr-2" /> Retry
               </button>
             </div>
-          </div>
-        )}
-        
-        {/* Main Content */}
-        <main className="flex-1 overflow-auto p-6">
-          <div className="mb-6 flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-foreground">
-                {activeItem?.label || "Dashboard"}
-              </h1>
-              {currentSection && (
-                <p className="text-foreground/70 mt-1">{currentSection.title}</p>
-              )}
-            </div>
-            
-            {/* Real-time Data Indicator */}
-            {lastUpdate && wsConnected && (
-              <div className="flex items-center space-x-2 text-xs text-foreground/50">
-                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                <span>Updated {new Date(lastUpdate).toLocaleTimeString()}</span>
-              </div>
-            )}
-          </div>
+          )}
+          <Routes>
+            {/* Core routes as explicitly defined */}
+            <Route path="/" element={<DashboardPage />} />
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
 
-          {/* Sample Content */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <div key={i} className="bg-card border border-border rounded-lg p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 bg-muted rounded-lg flex items-center justify-center">
-                    <div className="w-5 h-5 bg-primary rounded" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-card-foreground">Card {i}</h3>
-                    <p className="text-sm text-muted-foreground">Sample content</p>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="w-full bg-muted rounded-full h-2">
-                    <div 
-                      className="bg-primary h-2 rounded-full transition-all duration-300" 
-                      style={{ width: `${Math.random() * 100}%` }}
-                    />
-                  </div>
-                  <div className="flex justify-between text-sm text-muted-foreground">
-                    <span>Progress</span>
-                    <span>{Math.floor(Math.random() * 100)}%</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+            {/* Dynamically add routes for other top-level navigation items
+                This mapping assumes a direct correlation between navigation item IDs and page components.
+                You'll need to expand the switch statement for all your YAML 'id's.
+            */}
+            {topNavItems.map(item => {
+              // Exclude already explicitly defined routes to avoid duplicates or conflicts
+              if (['/', '/dashboard', '/settings'].includes(item.url)) return null;
+
+              let PageComponent = null;
+              switch (item.id) {
+                  case "home": PageComponent = DashboardPage; break; // 'home' could point to Dashboard
+                  case "devices": PageComponent = InventoryPage; break; // 'devices' maps to InventoryPage
+                  case "lab": PageComponent = FileUploaderPage; break; // 'lab' maps to FileUploaderPage (example)
+                  // Add more cases here for other top-level navigation items from your YAML
+                  // case "reports": PageComponent = ReportsPage; break; // If reports is a top-level page itself
+                  default: PageComponent = DashboardPage; // Fallback to Dashboard or a dedicated 404 page
+              }
+              return PageComponent ? <Route key={item.id} path={item.url} element={<PageComponent />} /> : null;
+            })}
+
+            {/* Routes for children of main navigation items (if they map to separate pages) */}
+            {/* These need to be explicitly defined or handled with a more advanced dynamic routing system */}
+
+            {/* Dashboard Children */}
+            <Route path="/dashboard/analytics" element={<DashboardPage />} /> {/* Assuming analytics is part of DashboardPage or a sub-component */}
+            <Route path="/dashboard/reports" element={<ReportsPage />} />
+
+            {/* Devices Children */}
+            <Route path="/devices/groups" element={<InventoryPage />} /> {/* Example: children of devices link to InventoryPage */}
+            <Route path="/devices/monitoring" element={<InventoryPage />} />
+
+            {/* Lab Children */}
+            <Route path="/lab/experiments" element={<FileUploaderPage />} /> {/* Example: children of lab link to FileUploaderPage */}
+            <Route path="/lab/protocols" element={<FileUploaderPage />} />
+            <Route path="/lab/samples" element={<FileUploaderPage />} />
+
+            {/* Settings Children */}
+            <Route path="/settings/user" element={<SettingsPage />} />
+            <Route path="/settings/system" element={<SettingsPage />} />
+
+            {/* Add a catch-all route for 404 if needed */}
+            {/* <Route path="*" element={<NotFoundPage />} /> */}
+          </Routes>
         </main>
       </div>
 
       {/* Notifications */}
-      {notifications && notifications.length > 0 && (
+      {notifications.length > 0 && (
         <div className="fixed top-20 right-4 z-30 space-y-2 max-w-sm">
           {notifications.slice(-3).map((notification) => (
             <div
               key={notification.id}
-              className={`
-                p-4 rounded-lg shadow-lg border transform transition-all duration-300 ease-in-out
-                ${notification.level === 'error' 
-                  ? 'bg-destructive/10 border-destructive/20 text-destructive'
-                  : notification.level === 'success'
-                  ? 'bg-green-50 border-green-200 text-green-800 dark:bg-green-900/20 dark:border-green-800 dark:text-green-200'
-                  : notification.level === 'warning'
-                  ? 'bg-yellow-50 border-yellow-200 text-yellow-800 dark:bg-yellow-900/20 dark:border-yellow-800 dark:text-yellow-200'
-                  : 'bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-900/20 dark:border-blue-800 dark:text-blue-200'
-                }
-              `}
+              className={`p-4 rounded-lg shadow-lg border ${
+                notification.level === 'error' ? 'bg-destructive/10 border-destructive/20 text-destructive' :
+                notification.level === 'success' ? 'bg-green-50 border-green-200 text-green-800' :
+                notification.level === 'warning' ? 'bg-yellow-50 border-yellow-200 text-yellow-800' :
+                'bg-blue-50 border-blue-200 text-blue-800'
+              }`}
             >
-              <div className="flex items-start space-x-3">
-                <div className="flex-shrink-0">
-                  {notification.level === 'error' && <AlertTriangle className="h-4 w-4" />}
-                  {notification.level === 'success' && <CheckCircle className="h-4 w-4" />}
-                  {notification.level === 'warning' && <RefreshCw className="h-4 w-4" />}
-                  {notification.level === 'info' && <Bell className="h-4 w-4" />}
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium">{notification.message}</p>
-                  <p className="text-xs opacity-75 mt-1">
-                    {notification.timestamp.toLocaleTimeString()}
-                  </p>
-                </div>
-              </div>
+              <p className="text-sm font-medium">{notification.message}</p>
             </div>
           ))}
         </div>
@@ -381,13 +324,13 @@ const SiteOrchestrator = () => {
   );
 };
 
-// Wrapped component with theme provider
-const SiteOrchestratorWithProvider = () => {
-  return (
-    <ThemeProvider>
-      <SiteOrchestrator />
-    </ThemeProvider>
-  );
-};
+// =============================================================================
+// WRAP WITH THEME PROVIDER
+// =============================================================================
+const SiteOrchestratorWithProvider = () => (
+  <ThemeProvider>
+    <SiteOrchestrator />
+  </ThemeProvider>
+);
 
 export default SiteOrchestratorWithProvider;

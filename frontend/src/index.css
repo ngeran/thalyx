@@ -1,69 +1,110 @@
+
+/* ==========================================================================
+ * Unified shadcn/ui + Yellow Theme CSS
+ * - Uses Tailwind layers
+ * - OKLCH Yellow palette converted into HSL numeric components
+ * - Works with Tailwind's alpha system: hsl(var(--color) / <alpha>)
+ * ========================================================================== */
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --radius: 0.65rem;
+
+    /* Light Mode Colors (Yellow Theme) */
+    --background: 0 0% 100%;            /* White */
+    --foreground: 220 5% 15%;           /* Dark gray */
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 220 5% 15%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222.2 84% 4.9%;
-    --muted: 210 40% 96%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96%;
-    --accent-foreground: 222.2 84% 4.9%;
-    --destructive: 0 84.2% 60.2%;
+    --popover-foreground: 220 5% 15%;
+
+    --primary: 48 96% 64%;              /* Bright Yellow */
+    --primary-foreground: 32 35% 20%;   /* Dark brown for contrast */
+
+    --secondary: 220 8% 92%;            /* Light gray */
+    --secondary-foreground: 220 5% 30%;
+
+    --muted: 220 8% 92%;
+    --muted-foreground: 220 10% 50%;
+
+    --accent: 220 8% 92%;
+    --accent-foreground: 220 5% 30%;
+
+    --destructive: 0 75% 45%;           /* Red */
     --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-    --radius: 0.5rem;
-    
+
+    --border: 220 8% 85%;
+    --input: 220 8% 85%;
+    --ring: 48 96% 64%;
+
+    /* Chart Colors */
+    --chart-1: 30 80% 55%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 200 70% 40%;
+    --chart-4: 50 90% 70%;
+    --chart-5: 340 75% 55%;
+
+    /* Sidebar */
     --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 240 5% 64.9%;
+    --sidebar-foreground: 220 5% 20%;
+    --sidebar-primary: 48 96% 64%;
+    --sidebar-primary-foreground: 32 35% 20%;
+    --sidebar-accent: 220 8% 92%;
+    --sidebar-accent-foreground: 220 5% 20%;
+    --sidebar-border: 220 8% 85%;
+    --sidebar-ring: 48 96% 64%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 84% 4.9%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    
-    --sidebar-background: 222.2 84% 4.9%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 210 40% 98%;
-    --sidebar-primary-foreground: 222.2 84% 4.9%;
-    --sidebar-accent: 217.2 32.6% 17.5%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 217.2 32.6% 17.5%;
-    --sidebar-ring: 212.7 26.8% 83.9%;
+    /* Dark Mode */
+    --background: 220 5% 15%;
+    --foreground: 0 0% 98%;
+
+    --card: 220 8% 20%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 220 8% 20%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 48 96% 64%;              /* Same Yellow */
+    --primary-foreground: 32 35% 20%;
+
+    --secondary: 220 8% 25%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 220 8% 25%;
+    --muted-foreground: 220 10% 70%;
+
+    --accent: 220 8% 25%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 70% 40%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 220 8% 25%;
+    --input: 220 8% 25%;
+    --ring: 48 96% 64%;
+
+    /* Dark Charts */
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+
+    /* Sidebar */
+    --sidebar-background: 220 8% 15%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 48 96% 64%;
+    --sidebar-primary-foreground: 32 35% 20%;
+    --sidebar-accent: 220 8% 25%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 220 8% 25%;
+    --sidebar-ring: 48 96% 64%;
   }
 }
 
@@ -71,7 +112,111 @@
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
   }
+
+  /* Scrollbar */
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--sidebar-border)) transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--sidebar-border));
+    border-radius: 3px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--sidebar-accent));
+  }
+
+  /* Focus styles */
+  .focus-visible-ring {
+    @apply focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+  }
+
+  /* Buttons */
+  .btn-primary {
+    @apply bg-primary text-primary-foreground shadow hover:bg-primary/90 focus-visible-ring;
+  }
+  .btn-secondary {
+    @apply bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80 focus-visible-ring;
+  }
+  .btn-ghost {
+    @apply hover:bg-accent hover:text-accent-foreground focus-visible-ring;
+  }
+  .btn-outline {
+    @apply border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground focus-visible-ring;
+  }
+
+  /* Cards */
+  .card {
+    @apply rounded-lg border bg-card text-card-foreground shadow-sm;
+  }
+
+  /* Input */
+  .input {
+    @apply flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors
+      file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground
+      focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring
+      disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  /* Navigation states */
+  .nav-active {
+    @apply bg-accent text-accent-foreground shadow-sm;
+  }
+  .nav-inactive {
+    @apply text-muted-foreground hover:bg-accent hover:text-accent-foreground;
+  }
+
+  /* Sidebar items */
+  .sidebar-item {
+    @apply flex items-center gap-2 px-2 py-1.5 text-sm rounded-md transition-colors;
+  }
+  .sidebar-item-active {
+    @apply bg-accent text-accent-foreground shadow-sm;
+  }
+  .sidebar-item-inactive {
+    @apply text-muted-foreground hover:bg-accent hover:text-accent-foreground;
+  }
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideIn {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
+}
+@keyframes spin {
+  to   { transform: rotate(360deg); }
+}
+.animate-fade-in { animation: fadeIn 0.2s ease-out; }
+.animate-slide-in { animation: slideIn 0.3s ease-out; }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .sidebar-mobile-overlay {
+    @apply fixed inset-0 z-50 bg-black/20 backdrop-blur-sm;
+  }
+  .sidebar-mobile {
+    @apply fixed left-0 top-0 h-full z-50 animate-slide-in;
+  }
+}
+
+/* Print */
+@media print {
+  .no-print { display: none !important; }
+  .print-full-width { width: 100% !important; margin: 0 !important; }
 }
