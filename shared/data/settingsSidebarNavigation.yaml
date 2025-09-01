@@ -8,7 +8,7 @@ navigation:
     type: section
     children:
       - id: profile
-        label: Profile
+        label: Profile 1
         icon: User
         type: page
       - id: preferences

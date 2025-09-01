@@ -2,22 +2,25 @@
  * SiteOrchestrator.jsx - COMPLETE REVISED VERSION
  * 
  * @description
- * Advanced site orchestrator that manages navigation between main content and settings.
- * Properly connects EnhancedSidebar and SettingsPage components with shared state management.
+ * Central navigation orchestrator that manages the entire application structure.
+ * Uses EXCLUSIVELY backend API data for navigation - no hardcoded fallbacks.
  * 
- * Key Enhancements:
- * - Fixed settings navigation state management
- * - Proper connection between sidebar and settings page
- * - Context-aware navigation with seamless transitions
- * - Maintains all existing WebSocket and theme functionality
+ * Key Features:
+ * - Single source of truth: All navigation data comes from backend APIs
+ * - Seamless context switching between main content and settings
+ * - Real-time WebSocket integration for live updates
+ * - Comprehensive state management with React Router synchronization
+ * - Theme-aware styling throughout
+ * 
+ * @backend_endpoints
+ * - GET /api/navigation - Main navigation structure
+ * - GET /api/navigation/settings - Settings navigation structure
  * 
  * @dependencies
  * - React (useState, useEffect, useMemo, useCallback hooks)
- * - React Router (Routes, Route)
+ * - React Router (Routes, Route, useNavigate, useLocation)
  * - Lucide React icons
- * - GlobalSiteNavigation component
- * - EnhancedSidebar component
- * - useNavigation hook
+ * - useApiData custom hook
  * - useWebSocketContext hook
  * - useTheme hook
  * - navigationProcessor utilities
@@ -54,7 +57,7 @@ import GlobalSiteNavigation from "./components/navigation/GlobalSiteNavigation.j
 import EnhancedSidebar from "./components/layout/EnhancedSidebar.jsx";
 
 // Hooks and contexts
-import { useNavigation } from "./hooks/useNavigation";
+import { useApiData } from "./hooks/useApiData";
 import { useWebSocketContext } from "./contexts/WebSocketContext";
 import { ThemeProvider, useTheme } from './hooks/useTheme';
 import { processNavigationData, flattenNavigationForTopNav, getSidebarItems } from "./utils/navigationProcessor";
@@ -64,53 +67,6 @@ import SettingsPage from "./pages/SettingsPage";
 import DashboardPage from "./pages/DashboardPage";
 import InventoryPage from "./pages/InventoryPage";
 import ReportsPage from "./pages/ReportsPage";
-
-// =============================================================================
-// SETTINGS NAVIGATION DATA
-// =============================================================================
-const SETTINGS_NAVIGATION = [
-  {
-    id: 'general',
-    label: 'General',
-    icon: Settings,
-    type: 'section',
-    children: [
-      { id: 'profile', label: 'Profile', icon: User, type: 'page' },
-      { id: 'preferences', label: 'Preferences', icon: Monitor, type: 'page' },
-      { id: 'notifications', label: 'Notifications', icon: Bell, type: 'page' }
-    ]
-  },
-  {
-    id: 'security',
-    label: 'Security',
-    icon: Shield,
-    type: 'section',
-    children: [
-      { id: 'authentication', label: 'Authentication', icon: Lock, type: 'page' },
-      { id: 'permissions', label: 'Permissions', icon: Users, type: 'page' }
-    ]
-  },
-  {
-    id: 'network',
-    label: 'Network',
-    icon: Network,
-    type: 'section',
-    children: [
-      { id: 'inventory', label: 'Device Inventory', icon: Database, type: 'page' },
-      { id: 'monitoring', label: 'Monitoring', icon: Activity, type: 'page' },
-      { id: 'topology', label: 'Network Topology', icon: Globe, type: 'page' }
-    ]
-  },
-  {
-    id: 'appearance',
-    label: 'Appearance',
-    icon: Palette,
-    type: 'section',
-    children: [
-      { id: 'theme', label: 'Theme Settings', icon: Palette, type: 'page' }
-    ]
-  }
-];
 
 // =============================================================================
 // MAIN COMPONENT
@@ -141,25 +97,34 @@ const SiteOrchestrator = () => {
   });
 
   // =============================================================================
-  // HOOKS AND CONTEXTS
+  // API DATA FETCHING - BACKEND ONLY (NO FALLBACKS)
   // =============================================================================
   
-  // Navigation hook
+  // Main navigation data from backend
   const { 
-    navigationData: httpNavigationData, 
-    loading, 
-    error, 
-    refresh: refreshNavigation, 
-    breadcrumbs, 
-    currentSection 
-  } = useNavigation({
-    enableRealTime: true,
-    enableBreadcrumbs: true,
-    cacheEnabled: true,
-    currentPath: window.location.pathname
-  });
+    data: mainNavigationData, 
+    loading: mainLoading, 
+    error: mainError, 
+    refresh: refreshMainNavigation 
+  } = useApiData(
+    'main-navigation',
+    () => fetch('/api/navigation').then(res => res.json()),
+    { debug: true }
+  );
 
-  // WebSocket context
+  // Settings navigation data from backend
+  const { 
+    data: settingsNavigationData, 
+    loading: settingsLoading, 
+    error: settingsError,
+    refresh: refreshSettingsNavigation
+  } = useApiData(
+    'settings-navigation',
+    () => fetch('/api/navigation/settings').then(res => res.json()),
+    { debug: true }
+  );
+
+  // WebSocket context for real-time updates
   const { 
     isConnected: wsConnected = false, 
     lastUpdate = null, 
@@ -168,30 +133,65 @@ const SiteOrchestrator = () => {
   } = useWebSocketContext() || {};
 
   // =============================================================================
+  // COMPUTED VALUES
+  // =============================================================================
+  
+  // Combined loading and error states
+  const loading = mainLoading || settingsLoading;
+  const error = mainError || settingsError;
+
+  // Process navigation data for consumption
+  const processedNavigation = useMemo(() => 
+    processNavigationData(mainNavigationData), 
+    [mainNavigationData]
+  );
+
+  const topNavItems = useMemo(() => 
+    flattenNavigationForTopNav(processedNavigation), 
+    [processedNavigation]
+  );
+
+  // =============================================================================
   // EFFECTS FOR ROUTE SYNCHRONIZATION
   // =============================================================================
   
-  // Sync active page with current route
+  /**
+   * Sync active page with current browser route
+   * Handles both main navigation and settings routes
+   */
   useEffect(() => {
     const path = location.pathname;
+    
     if (path === '/settings' || path.startsWith('/settings/')) {
+      // We're in settings context
       setIsInSettingsContext(true);
-      // Extract settings page from path if available
-      const settingsPage = path.split('/')[2] || 'profile';
+      
+      // Extract settings page from URL path
+      const pathSegments = path.split('/').filter(Boolean);
+      const settingsPage = pathSegments.length > 1 ? pathSegments[1] : 'profile';
       setSettingsActivePageId(settingsPage);
     } else {
+      // We're in main navigation context
       setIsInSettingsContext(false);
-      // Set main page based on route
+      
+      // Extract main page from URL path
       const page = path.replace('/', '') || 'dashboard';
       setActivePageId(page);
     }
   }, [location.pathname]);
 
-  // Responsive sidebar handling
+  /**
+   * Responsive sidebar handling
+   * Auto-collapse on mobile, expand on desktop
+   */
   useEffect(() => {
-    const handleResize = () => setSidebarOpen(window.innerWidth >= 1024);
+    const handleResize = () => {
+      setSidebarOpen(window.innerWidth >= 1024);
+    };
+    
     handleResize();
     window.addEventListener('resize', handleResize);
+    
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
@@ -199,7 +199,10 @@ const SiteOrchestrator = () => {
   // NAVIGATION HANDLERS
   // =============================================================================
   
-  // Handle main page navigation
+  /**
+   * Handle main page navigation
+   * @param {string} pageId - The page ID to navigate to
+   */
   const handleMainPageChange = useCallback((pageId) => {
     if (pageId === 'settings') {
       // Enter settings context
@@ -214,51 +217,56 @@ const SiteOrchestrator = () => {
     }
   }, [navigate]);
 
-  // Handle settings page navigation
+  /**
+   * Handle settings page navigation
+   * @param {string} settingsPageId - The settings page ID to navigate to
+   */
   const handleSettingsPageChange = useCallback((settingsPageId) => {
     setSettingsActivePageId(settingsPageId);
     navigate(`/settings/${settingsPageId}`);
   }, [navigate]);
 
-  // Exit settings context
+  /**
+   * Exit settings context and return to main navigation
+   */
   const handleExitSettings = useCallback(() => {
     navigate('/dashboard');
     setIsInSettingsContext(false);
     setActivePageId('dashboard');
   }, [navigate]);
 
-  const toggleSidebar = useCallback(() => setSidebarOpen(!sidebarOpen), [sidebarOpen]);
+  /**
+   * Toggle sidebar open/closed state
+   */
+  const toggleSidebar = useCallback(() => {
+    setSidebarOpen(prev => !prev);
+  }, []);
 
   // =============================================================================
-  // MEMOIZED NAVIGATION DATA
+  // MEMOIZED NAVIGATION DATA FOR SIDEBAR
   // =============================================================================
   
-  // Determine which navigation to show in sidebar
+  /**
+   * Determine which navigation data to show in sidebar based on context
+   * Uses backend data exclusively - no fallbacks
+   */
   const sidebarItems = useMemo(() => {
     if (isInSettingsContext) {
-      // Show settings navigation when in settings context
-      return SETTINGS_NAVIGATION;
+      // Show settings navigation from backend
+      return settingsNavigationData?.navigation || settingsNavigationData || [];
     } else {
-      // Show main navigation for other pages
-      const navigationData = wsConnected && httpNavigationData ? httpNavigationData : httpNavigationData;
-      if (!navigationData) {
-        // Fallback main navigation
-        return [
-          { id: 'dashboard', label: 'Dashboard', icon: Home, type: 'page' },
-          { id: 'inventory', label: 'Inventory', icon: Database, type: 'page' },
-          { id: 'reports', label: 'Reports', icon: BarChart, type: 'page' },
-          { id: 'settings', label: 'Settings', icon: Settings, type: 'page' }
-        ];
-      }
-      const processedNavigation = processNavigationData(navigationData);
-      return getSidebarItems(processedNavigation, activePageId);
+      // Show main navigation from backend
+      if (!mainNavigationData) return [];
+      
+      const processedNav = processNavigationData(mainNavigationData);
+      return getSidebarItems(processedNav, activePageId);
     }
-  }, [isInSettingsContext, activePageId, wsConnected, httpNavigationData]);
-
-  // Memoized navigation data for top nav
-  const navigationData = useMemo(() => (wsConnected && httpNavigationData ? httpNavigationData : httpNavigationData), [wsConnected, httpNavigationData]);
-  const processedNavigation = useMemo(() => processNavigationData(navigationData), [navigationData]);
-  const topNavItems = useMemo(() => flattenNavigationForTopNav(processedNavigation), [processedNavigation]);
+  }, [
+    isInSettingsContext, 
+    settingsNavigationData, 
+    mainNavigationData, 
+    activePageId
+  ]);
 
   // =============================================================================
   // SIDEBAR PROPS CONFIGURATION
@@ -266,19 +274,25 @@ const SiteOrchestrator = () => {
   
   const sidebarProps = useMemo(() => {
     return {
+      // Navigation data
       items: sidebarItems,
       pageTitle: isInSettingsContext ? "Settings" : "Thalyx",
+      
+      // State management
       isOpen: sidebarOpen,
       onToggle: toggleSidebar,
       activePageId: isInSettingsContext ? settingsActivePageId : activePageId,
+      
+      // Navigation handlers
       onItemSelect: isInSettingsContext ? handleSettingsPageChange : handleMainPageChange,
+      navigationContext: isInSettingsContext ? 'settings' : 'main',
+      onSettingsItemSelect: handleSettingsPageChange,
+      
+      // Real-time status
       wsConnected,
       lastUpdate,
       theme,
-      connectionStats,
-      // Dynamic navigation props
-      navigationContext: isInSettingsContext ? 'settings' : 'main',
-      onSettingsItemSelect: handleSettingsPageChange
+      connectionStats
     };
   }, [
     sidebarItems,
@@ -300,7 +314,7 @@ const SiteOrchestrator = () => {
   // =============================================================================
   return (
     <div className={`flex flex-col h-screen bg-background text-foreground ${theme}`}>
-      {/* Navigation */}
+      {/* Global Navigation Header */}
       <GlobalSiteNavigation
         user={currentUser}
         currentPage={activePageId}
@@ -310,34 +324,44 @@ const SiteOrchestrator = () => {
         onExitSettings={handleExitSettings}
       />
 
-      {/* Content */}
+      {/* Main Content Area */}
       <div className="flex flex-1 overflow-hidden">
         {/* Enhanced Sidebar with Dynamic Navigation */}
         <EnhancedSidebar {...sidebarProps} />
 
         <main className="flex-1 overflow-auto p-6 mt-4">
           {/* Loading and Error States */}
-          {loading && <Loader2 className="animate-spin h-12 w-12 mx-auto" />}
+          {loading && (
+            <div className="text-center py-12">
+              <Loader2 className="animate-spin h-12 w-12 mx-auto mb-4 text-primary" />
+              <p className="text-muted-foreground">Loading navigation data from backend...</p>
+            </div>
+          )}
+          
           {error && (
-            <div className="text-center text-red-500">
-              <AlertTriangle className="h-12 w-12 mx-auto mb-4" />
-              <p>Navigation Error: {error}</p>
+            <div className="text-center py-12">
+              <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-destructive" />
+              <p className="text-destructive mb-4">Navigation Error: {error.message}</p>
               <button 
-                onClick={refreshNavigation} 
-                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg"
+                onClick={() => {
+                  refreshMainNavigation();
+                  refreshSettingsNavigation();
+                }} 
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90"
               >
-                <RefreshCw className="inline h-4 w-4 mr-2" /> Retry
+                <RefreshCw className="inline h-4 w-4 mr-2" /> Retry Connection
               </button>
             </div>
           )}
           
-          {/* Routes */}
+          {/* Application Routes */}
           <Routes>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/inventory" element={<InventoryPage />} />
             <Route path="/reports" element={<ReportsPage />} />
-            {/* Settings routes with dynamic content */}
+            
+            {/* Settings Routes */}
             <Route 
               path="/settings" 
               element={
@@ -362,7 +386,7 @@ const SiteOrchestrator = () => {
         </main>
       </div>
 
-      {/* Notifications */}
+      {/* Real-time Notifications */}
       {notifications.length > 0 && (
         <div className="fixed top-20 right-4 z-30 space-y-2 max-w-sm">
           {notifications.slice(-3).map((notification) => (
