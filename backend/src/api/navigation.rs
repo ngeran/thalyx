@@ -42,3 +42,16 @@ pub async fn get_navigation_from_yaml(
         .await?;
     Ok(Json(data))
 }
+
+/// Handler that returns settings navigation data from YAML
+pub async fn get_settings_navigation(
+    Query(params): Query<HashMap<String, String>>,
+    State(state): State<AppState>,
+) -> ApiResult<Json<serde_json::Value>> {
+    let file_path = params.get("file").cloned();
+    let data = state
+        .yaml_service
+        .get_yaml_data("settingsSidebarNavigation", file_path.as_deref())
+        .await?;
+    Ok(Json(data))
+}

@@ -119,6 +119,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Navigation configuration endpoints
         .route("/api/navigation", get(api::navigation::get_navigation))
         .route("/api/navigation/yaml", get(api::navigation::get_navigation_from_yaml))
+        
+        // SideBar Navigation Route
+        .route("/api/navigation/settings", get(api::navigation::get_settings_navigation))
+
+
         .route("/api/reload", get(api::handlers::reload_schemas))
         
         // WebSocket endpoints

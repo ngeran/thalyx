@@ -21,7 +21,7 @@ navigation:
         type: page
 
   - id: security
-    label: Security
+    label: Security Rust
     icon: Shield
     type: section
     children:

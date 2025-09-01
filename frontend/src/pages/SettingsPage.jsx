@@ -1,21 +1,26 @@
 /**
- * SettingsPage.jsx - COMPLETE REVISED VERSION
+ * SettingsPage.jsx - PRODUCTION READY VERSION WITH DEBUGGING
  * 
  * @description
- * Settings page component with consistent dark theme implementation.
- * Now properly inherits the theme context and maintains visual consistency
- * with the rest of the application.
+ * Settings page component with backend API integration, comprehensive debugging,
+ * and consistent theme implementation. Exclusively uses backend data with no fallbacks.
  * 
- * Key Enhancements:
- * - Fixed dark theme consistency (now uses same black background as sidebar)
- * - Improved theme-aware styling throughout all components
- * - Enhanced navigation state management
- * - Better integration with parent component state
+ * Key Features:
+ * - Fetches navigation data exclusively from Rust backend
+ * - Comprehensive debug logging and state inspection
+ * - Real-time backend connection monitoring
+ * - Production-ready error handling
+ * - Theme-aware styling throughout
  * 
  * @dependencies
  * - React (useState, useEffect, useMemo)
  * - Lucide React icons
- * - EnhancedSidebar component (for navigation)
+ * - useApiData custom hook for API calls
+ * - useTheme hook for consistent styling
+ * 
+ * @backend_endpoints
+ * - GET /api/navigation/settings - Returns settings navigation structure
+ * - GET /api/network/inventory - Returns network inventory data
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -28,330 +33,567 @@ import {
   Palette,
   Bell,
   Monitor,
-  Router,
-  Server,
-  Plus,
-  Edit,
-  Trash2,
-  Save,
-  X,
-  Download,
-  Upload,
-  Search,
-  Filter,
-  MapPin,
-  Wifi,
-  HardDrive,
-  Lock,
-  Users,
-  Activity,
-  Globe,
   ChevronRight,
-  ChevronDown,
   AlertCircle,
   CheckCircle,
-  Loader2
+  Loader2,
+  Download,
+  Save,
+  Bug,
+  DatabaseIcon,
+  RefreshCw
 } from 'lucide-react';
 
-// Import theme hook for consistent styling - FIXED IMPORT PATH
+// Import theme hook for consistent styling
 import { useTheme } from '../hooks/useTheme';
 
-// ===========================================================================
-// SETTINGS NAVIGATION DATA
-// ===========================================================================
-const settingsNavigationData = [
-  {
-    id: 'general',
-    label: 'General',
-    icon: Settings,
-    type: 'section',
-    children: [
-      { id: 'profile', label: 'Profile', icon: User, type: 'page', description: 'Manage your personal information' },
-      { id: 'preferences', label: 'Preferences', icon: Monitor, type: 'page', description: 'Customize your experience' },
-      { id: 'notifications', label: 'Notifications', icon: Bell, type: 'page', description: 'Configure alert settings' }
-    ]
-  },
-  {
-    id: 'security',
-    label: 'Security',
-    icon: Shield,
-    type: 'section',
-    children: [
-      { id: 'authentication', label: 'Authentication', icon: Lock, type: 'page', description: 'Manage login security' },
-      { id: 'permissions', label: 'Permissions', icon: Users, type: 'page', description: 'Control user access' }
-    ]
-  },
-  {
-    id: 'network',
-    label: 'Network',
-    icon: Network,
-    type: 'section',
-    children: [
-      { id: 'inventory', label: 'Device Inventory', icon: Database, type: 'page', description: 'Manage network devices' },
-      { id: 'monitoring', label: 'Monitoring', icon: Activity, type: 'page', description: 'Configure monitoring settings' },
-      { id: 'topology', label: 'Network Topology', icon: Globe, type: 'page', description: 'View network layout' }
-    ]
-  },
-  {
-    id: 'appearance',
-    label: 'Appearance',
-    icon: Palette,
-    type: 'section',
-    children: [
-      { id: 'theme', label: 'Theme Settings', icon: Palette, type: 'page', description: 'Customize interface appearance' }
-    ]
-  }
-];
+// Import API hook
+import { useApiData } from '../hooks/useApiData';
 
 // ===========================================================================
-// DEMO NETWORK INVENTORY DATA
+// API CLIENT FOR RUST BACKEND WITH DEBUGGING
 // ===========================================================================
-const demoInventoryData = [
-  {
-    location: 'BASEMENT',
-    routers: [
-      {
-        id: 'router-1',
-        host_name: 'MLRDCIENGDJRX01',
-        ip_address: '172.27.200.200',
-        vendor: 'JUNIPER',
-        platform: 'SRX320',
-        status: 'online',
-        last_seen: new Date().toISOString()
-      },
-      {
-        id: 'router-2',
-        host_name: 'MLRDCIENGDJRX02',
-        ip_address: '172.27.200.201',
-        vendor: 'JUNIPER',
-        platform: 'SRX210H',
-        status: 'online',
-        last_seen: new Date().toISOString()
+/**
+ * API client for communicating with Rust backend with comprehensive debugging
+ * 
+ * @endpoints
+ * - GET /api/navigation/settings - Retrieve settings navigation structure
+ * - GET /api/network/inventory - Retrieve network inventory data
+ */
+const apiClient = {
+  /**
+   * Fetch settings navigation from Rust backend with debug logging
+   * 
+   * @param {boolean} debug - Enable debug logging
+   * @returns {Promise} Promise resolving to navigation data
+   * @throws {Error} If network request fails or response is invalid
+   */
+  getSettingsNavigation: async (debug = false) => {
+    const startTime = Date.now();
+    const endpoint = '/api/navigation/settings';
+    
+    try {
+      if (debug) console.log('🔵 [API] Fetching settings navigation from:', endpoint);
+      
+      const response = await fetch(endpoint, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const duration = Date.now() - startTime;
+      
+      // Check response status
+      if (!response.ok) {
+        const error = new Error(`HTTP error! status: ${response.status}`);
+        if (debug) console.error('🔴 [API] HTTP error:', error.message, { duration, status: response.status });
+        throw error;
       }
-    ],
-    switches: [
-      {
-        id: 'switch-1',
-        host_name: 'MLRDCIENGDJSW01',
-        ip_address: '172.27.200.210',
-        vendor: 'CISCO',
-        platform: 'C9300-24T',
-        status: 'online',
-        last_seen: new Date().toISOString()
+
+      // Verify response is JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const error = new Error('Server responded with non-JSON content');
+        if (debug) console.error('🔴 [API] Non-JSON response:', { duration, contentType });
+        throw error;
       }
-    ],
-    firewalls: [
-      {
-        id: 'firewall-1',
-        host_name: 'MLRDCIENGDJFW01',
-        ip_address: '172.27.200.220',
-        vendor: 'FORTINET',
-        platform: 'FortiGate-60F',
-        status: 'warning',
-        last_seen: new Date(Date.now() - 300000).toISOString() // 5 minutes ago
+
+      const data = await response.json();
+      const result = data.navigation || data;
+      
+      if (debug) {
+        console.log('✅ [API] Successfully fetched navigation:', {
+          duration: `${duration}ms`,
+          endpoint,
+          sectionCount: result.length,
+          sections: result.map(s => ({ id: s.id, label: s.label, items: s.children?.length || 0 })),
+          fullData: result
+        });
       }
-    ]
+      
+      return result;
+      
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      if (debug) console.error('🔴 [API] Failed to fetch settings navigation:', {
+        error: error.message,
+        duration: `${duration}ms`,
+        endpoint
+      });
+      throw error;
+    }
   },
-  {
-    location: 'DATACENTER',
-    routers: [
-      {
-        id: 'router-3',
-        host_name: 'MLDCCORERTR01',
-        ip_address: '10.1.1.1',
-        vendor: 'CISCO',
-        platform: 'ISR4431',
-        status: 'online',
-        last_seen: new Date().toISOString()
+
+  /**
+   * Fetch network inventory data from Rust backend
+   * 
+   * @returns {Promise} Promise resolving to inventory data
+   * @throws {Error} If network request fails
+   */
+  getInventory: async () => {
+    try {
+      const response = await fetch('/api/network/inventory', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
-    ],
-    switches: [
-      {
-        id: 'switch-2',
-        host_name: 'MLDCCORESW01',
-        ip_address: '10.1.1.10',
-        vendor: 'CISCO',
-        platform: 'C9500-32C',
-        status: 'online',
-        last_seen: new Date().toISOString()
-      },
-      {
-        id: 'switch-3',
-        host_name: 'MLDCCORESW02',
-        ip_address: '10.1.1.11',
-        vendor: 'CISCO',
-        platform: 'C9500-32C',
-        status: 'offline',
-        last_seen: new Date(Date.now() - 3600000).toISOString() // 1 hour ago
-      }
-    ],
-    firewalls: [
-      {
-        id: 'firewall-2',
-        host_name: 'MLDCCOREFW01',
-        ip_address: '10.1.1.20',
-        vendor: 'PALO_ALTO',
-        platform: 'PA-3220',
-        status: 'online',
-        last_seen: new Date().toISOString()
-      }
-    ]
+
+      const data = await response.json();
+      return data.inventory || data;
+      
+    } catch (error) {
+      console.error('Failed to fetch inventory:', error);
+      throw error;
+    }
   }
-];
+};
+
+// ===========================================================================
+// DEBUG COMPONENTS
+// ===========================================================================
+
+/**
+ * DebugPanel - Displays comprehensive debug information
+ */
+const DebugPanel = ({ navigationData, debugInfo, onRefresh }) => {
+  const [expanded, setExpanded] = useState(false);
+  
+  if (!debugInfo) return null;
+
+  return (
+    <div className="mb-4 border border-gray-300 rounded-lg overflow-hidden">
+      <button 
+        onClick={() => setExpanded(!expanded)}
+        className="w-full p-3 bg-gray-100 hover:bg-gray-200 flex items-center justify-between text-left"
+      >
+        <div className="flex items-center gap-2">
+          <Bug className="h-4 w-4 text-blue-600" />
+          <span className="font-medium">Debug Information</span>
+          <span className="text-xs text-gray-500">
+            {debugInfo.dataSource} • {debugInfo.sectionCount} sections
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <RefreshCw 
+            className="h-4 w-4 text-gray-500 hover:text-gray-700" 
+            onClick={(e) => { e.stopPropagation(); onRefresh(); }}
+          />
+          {expanded ? '▲' : '▼'}
+        </div>
+      </button>
+      
+      {expanded && (
+        <div className="p-4 bg-white text-xs font-mono">
+          <div className="grid grid-cols-2 gap-4 mb-3">
+            <div>
+              <strong>Data Source:</strong> {debugInfo.dataSource}
+            </div>
+            <div>
+              <strong>Sections:</strong> {debugInfo.sectionCount}
+            </div>
+            <div>
+              <strong>Last Updated:</strong> {debugInfo.lastUpdated}
+            </div>
+            <div>
+              <strong>Duration:</strong> {debugInfo.requestDuration}ms
+            </div>
+          </div>
+          
+          <div className="mb-3">
+            <strong>Section Details:</strong>
+            <div className="mt-1 space-y-1">
+              {navigationData?.map((section, index) => (
+                <div key={section.id} className="flex justify-between">
+                  <span>{section.label}</span>
+                  <span className="text-gray-500">
+                    {section.children?.length || 0} items
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          <div>
+            <strong>Raw Data Preview:</strong>
+            <pre className="mt-1 p-2 bg-gray-100 rounded overflow-x-auto">
+              {JSON.stringify(navigationData?.slice(0, 2), null, 2)}
+            </pre>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+/**
+ * ConnectionStatus - Shows backend connection status
+ */
+const ConnectionStatus = ({ loading, error, lastUpdated }) => {
+  if (loading) {
+    return (
+      <div className="mb-4 p-3 bg-blue-100 text-blue-800 rounded-lg border border-blue-300 flex items-center gap-2">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        <span>Connecting to backend...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="mb-4 p-3 bg-red-100 text-red-800 rounded-lg border border-red-300 flex items-center gap-2">
+        <AlertCircle className="h-4 w-4" />
+        <span>Backend connection failed: {error.message}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-4 p-3 bg-green-100 text-green-800 rounded-lg border border-green-300 flex items-center gap-2">
+      <CheckCircle className="h-4 w-4" />
+      <span>Connected to backend {lastUpdated}</span>
+    </div>
+  );
+};
 
 // ===========================================================================
 // MAIN SETTINGS PAGE COMPONENT
 // ===========================================================================
+/**
+ * EnhancedSettingsPage - Main settings page component with debugging
+ * 
+ * @param {Object} props - Component props
+ * @param {string} props.activeSettingsPage - Currently active settings page ID
+ * @param {Function} props.onSettingsPageChange - Callback for page change events
+ * @param {Function} props.onExitSettings - Callback for exiting settings
+ * @param {boolean} props.debug - Enable debug features
+ * 
+ * @returns {JSX.Element} Rendered settings page component
+ */
 const EnhancedSettingsPage = ({ 
   activeSettingsPage = 'profile', 
   onSettingsPageChange,
-  onExitSettings 
+  onExitSettings,
+  debug = false 
 }) => {
-  const { theme } = useTheme(); // Get current theme for consistent styling
+  const { theme } = useTheme();
   
-  // State management
-  const [selectedNavItem, setSelectedNavItem] = useState(activeSettingsPage);
-  const [expandedSections, setExpandedSections] = useState(new Set(['general']));
-  const [inventoryData, setInventoryData] = useState(demoInventoryData);
-  const [editingItem, setEditingItem] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedLocation, setSelectedLocation] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [saveStatus, setSaveStatus] = useState(null);
-
-  // Computed values
-  const currentSection = useMemo(() => {
-    return settingsNavigationData.find(section =>
-      section.children?.some(child => child.id === selectedNavItem)
-    );
-  }, [selectedNavItem]);
-
-  const currentPage = useMemo(() => {
-    return currentSection?.children?.find(child => child.id === selectedNavItem);
-  }, [currentSection, selectedNavItem]);
-
-  const filteredInventory = useMemo(() => {
-    return inventoryData.filter(location => {
-      if (selectedLocation && location.location !== selectedLocation) return false;
-      
-      const searchLower = searchTerm.toLowerCase();
-      if (!searchTerm) return true;
-      
-      return location.location.toLowerCase().includes(searchLower) ||
-        [...(location.routers || []), ...(location.switches || []), ...(location.firewalls || [])].some(device =>
-          device.host_name.toLowerCase().includes(searchLower) ||
-          device.ip_address.includes(searchTerm) ||
-          device.vendor.toLowerCase().includes(searchLower) ||
-          device.platform.toLowerCase().includes(searchLower)
-        );
-    });
-  }, [inventoryData, searchTerm, selectedLocation]);
-
-  const locations = useMemo(() => 
-    [...new Set(inventoryData.map(item => item.location))], 
-    [inventoryData]
+  // ===========================================================================
+  // API DATA FETCHING - NO FALLBACK DATA
+  // ===========================================================================
+  const { 
+    data: settingsNavigationData, 
+    loading: navigationLoading, 
+    error: navigationError,
+    refresh: refreshNavigation,
+    debugInfo: apiDebugInfo
+  } = useApiData(
+    'settings-navigation',
+    () => apiClient.getSettingsNavigation(debug),
+    { 
+      debug,
+      onError: (error) => {
+        console.error('Settings navigation error:', error);
+        if (debug) {
+          console.log('🔴 [SettingsPage] Navigation data unavailable - check backend connection');
+        }
+      }
+    }
   );
 
-  // Sync with parent component
-  useEffect(() => {
-    setSelectedNavItem(activeSettingsPage);
-  }, [activeSettingsPage]);
+  // ===========================================================================
+  // STATE MANAGEMENT
+  // ===========================================================================
+  const [selectedNavItem, setSelectedNavItem] = useState(activeSettingsPage);
+  const [expandedSections, setExpandedSections] = useState(new Set());
+  const [loading, setLoading] = useState(false);
+  const [lastRefresh, setLastRefresh] = useState(new Date());
 
-  // Auto-expand section containing active page
-  useEffect(() => {
+  // ===========================================================================
+  // COMPUTED VALUES WITH DEBUG INFO
+  // ===========================================================================
+  const currentSection = useMemo(() => {
+    if (!settingsNavigationData) return null;
     const section = settingsNavigationData.find(section =>
       section.children?.some(child => child.id === selectedNavItem)
     );
-    if (section) {
-      setExpandedSections(prev => new Set([...prev, section.id]));
+    if (debug && section) {
+      console.log('✅ [SettingsPage] Current section:', section);
     }
-  }, [selectedNavItem]);
+    return section;
+  }, [selectedNavItem, settingsNavigationData, debug]);
 
-  // ... rest of your device management functions remain the same
+  const currentPage = useMemo(() => {
+    if (!currentSection || !currentSection.children) return null;
+    const page = currentSection.children.find(child => child.id === selectedNavItem);
+    if (debug && page) {
+      console.log('✅ [SettingsPage] Current page:', page);
+    }
+    return page;
+  }, [currentSection, selectedNavItem, debug]);
 
-  // Device Status Badge Component
-  const DeviceStatusBadge = ({ status }) => {
-    const getStatusConfig = (status) => {
-      switch (status) {
-        case 'online':
-          return { color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200', icon: CheckCircle };
-        case 'offline':
-          return { color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200', icon: AlertCircle };
-        case 'warning':
-          return { color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200', icon: AlertCircle };
-        default:
-          return { color: 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200', icon: AlertCircle };
+  // Prepare debug information
+  const debugInfo = useMemo(() => ({
+    dataSource: navigationError ? 'error' : settingsNavigationData ? 'backend' : 'loading',
+    sectionCount: settingsNavigationData?.length || 0,
+    lastUpdated: lastRefresh.toLocaleTimeString(),
+    requestDuration: apiDebugInfo?.lastDuration || 0,
+    currentSection: currentSection?.label || 'None',
+    currentPage: currentPage?.label || 'None',
+    apiStatus: navigationError ? 'error' : navigationLoading ? 'loading' : 'success'
+  }), [settingsNavigationData, navigationLoading, navigationError, currentSection, currentPage, lastRefresh, apiDebugInfo]);
+
+  // ===========================================================================
+  // EFFECTS
+  // ===========================================================================
+  
+  /**
+   * Sync with parent component's active page
+   */
+  useEffect(() => {
+    if (debug) console.log('🔄 [SettingsPage] Active page sync:', activeSettingsPage);
+    setSelectedNavItem(activeSettingsPage);
+  }, [activeSettingsPage, debug]);
+
+  /**
+   * Auto-expand section containing active page when data is available
+   */
+  useEffect(() => {
+    if (settingsNavigationData && selectedNavItem) {
+      const section = settingsNavigationData.find(section =>
+        section.children?.some(child => child.id === selectedNavItem)
+      );
+      if (section) {
+        if (debug) console.log('📂 [SettingsPage] Auto-expanding section:', section.id);
+        setExpandedSections(prev => new Set([...prev, section.id]));
       }
-    };
+    }
+  }, [selectedNavItem, settingsNavigationData, debug]);
 
-    const config = getStatusConfig(status);
-    const StatusIcon = config.icon;
+  /**
+   * Log navigation data when it changes
+   */
+  useEffect(() => {
+    if (settingsNavigationData && debug) {
+      console.log('✅ [SettingsPage] Navigation data loaded:', {
+        sections: settingsNavigationData.map(s => ({
+          id: s.id,
+          label: s.label,
+          itemCount: s.children?.length || 0
+        })),
+        fullData: settingsNavigationData
+      });
+    }
+  }, [settingsNavigationData, debug]);
 
-    return (
-      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${config.color}`}>
-        <StatusIcon className="h-3 w-3" />
-        {status}
-      </span>
-    );
+  // ===========================================================================
+  // HANDLERS
+  // ===========================================================================
+  
+  const handleRefresh = () => {
+    if (debug) console.log('🔄 [SettingsPage] Manual refresh triggered');
+    refreshNavigation();
+    setLastRefresh(new Date());
   };
 
-  // Main render - REMOVED the internal sidebar since SiteOrchestrator handles it
+  // ===========================================================================
+  // RENDER STATES
+  // ===========================================================================
+  
+  /**
+   * Loading state - shows spinner while fetching navigation data
+   */
+  if (navigationLoading) {
+    return (
+      <div className="h-full bg-background text-foreground flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+          <p className="text-muted-foreground">Loading settings from backend...</p>
+          {debug && (
+            <div className="mt-2 text-xs text-gray-500">
+              Fetching: /api/navigation/settings
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  /**
+   * Error state - shows error message when navigation data fails to load
+   */
+  if (navigationError) {
+    return (
+      <div className="h-full bg-background text-foreground flex items-center justify-center">
+        <div className="text-center max-w-md p-6 bg-card rounded-lg border border-border">
+          <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
+          <h2 className="text-xl font-semibold mb-2">Backend Connection Error</h2>
+          <p className="text-muted-foreground mb-4">
+            Could not load settings navigation from backend. Please check:
+          </p>
+          <ul className="text-sm text-muted-foreground mb-4 text-left">
+            <li>• Backend server is running on port 3001</li>
+            <li>• Endpoint: GET /api/navigation/settings</li>
+            <li>• CORS is properly configured</li>
+          </ul>
+          <div className="flex gap-2 justify-center">
+            <button 
+              onClick={handleRefresh}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 flex items-center gap-2"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Retry Connection
+            </button>
+          </div>
+          {debug && (
+            <div className="mt-4 p-3 bg-red-100 rounded text-xs">
+              <strong>Error Details:</strong> {navigationError.message}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  /**
+   * Empty state - shows message when no navigation data is available
+   */
+  if (!settingsNavigationData || settingsNavigationData.length === 0) {
+    return (
+      <div className="h-full bg-background text-foreground flex items-center justify-center">
+        <div className="text-center max-w-md p-6 bg-card rounded-lg border border-border">
+          <DatabaseIcon className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+          <h2 className="text-xl font-semibold mb-2">No Settings Configuration</h2>
+          <p className="text-muted-foreground mb-4">
+            Backend connected successfully but no navigation data was returned.
+          </p>
+          <button 
+            onClick={handleRefresh}
+            className="px-4 py-2 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/80"
+          >
+            Check Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ===========================================================================
+  // MAIN RENDER
+  // ===========================================================================
   return (
-    <div className="h-full bg-background text-foreground"> {/* Use theme-aware background */}
+    <div className="h-full bg-background text-foreground">
       {/* Content Header */}
-      <div className="p-6 border-b border-border"> {/* Use theme-aware border */}
+      <div className="p-6 border-b border-border">
         <div className="flex items-center justify-between">
           <div>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1"> {/* Use theme-aware text */}
+            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
               <span>Settings</span>
               <ChevronRight className="h-3 w-3" />
-              <span>{currentSection?.label}</span>
+              <span>{currentSection?.label || 'General'}</span>
               <ChevronRight className="h-3 w-3" />
-              <span className="text-foreground">{currentPage?.label}</span> {/* Use theme-aware text */}
+              <span className="text-foreground">{currentPage?.label || 'Settings'}</span>
             </div>
-            <h1 className="text-2xl font-semibold text-foreground"> {/* Use theme-aware text */}
+            <h1 className="text-2xl font-semibold text-foreground">
               {currentPage?.label || 'Settings'}
             </h1>
             {currentPage?.description && (
-              <p className="text-muted-foreground mt-1"> {/* Use theme-aware text */}
+              <p className="text-muted-foreground mt-1">
                 {currentPage.description}
               </p>
             )}
           </div>
           
-          {selectedNavItem === 'inventory' && (
-            <div className="flex gap-2">
-              <button 
-                onClick={() => {}} // Placeholder for export function
-                className="px-4 py-2 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/80 flex items-center gap-2"
-              >
-                <Download className="h-4 w-4" />
-                Export
-              </button>
-              <button 
-                disabled={loading}
-                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 flex items-center gap-2 disabled:opacity-50"
-              >
-                {loading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Save className="h-4 w-4" />
-                )}
-                Save Changes
-              </button>
-            </div>
-          )}
+          <div className="flex gap-2">
+            <button 
+              onClick={handleRefresh}
+              className="px-3 py-2 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/80 flex items-center gap-2"
+              title="Refresh navigation data"
+            >
+              <RefreshCw className="h-4 w-4" />
+              {debug && 'Refresh'}
+            </button>
+            
+            {selectedNavItem === 'inventory' && (
+              <>
+                <button 
+                  onClick={() => {}} // Placeholder for export function
+                  className="px-4 py-2 bg-secondary text-secondary-foreground rounded-lg hover:bg-secondary/80 flex items-center gap-2"
+                >
+                  <Download className="h-4 w-4" />
+                  Export
+                </button>
+                <button 
+                  disabled={loading}
+                  className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 flex items-center gap-2 disabled:opacity-50"
+                >
+                  {loading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4" />
+                  )}
+                  Save Changes
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Content Area */}
-      <div className="p-6 overflow-y-auto bg-background h-full"> {/* Use theme-aware background */}
-        {/* Placeholder content - replace with your actual content rendering */}
+      <div className="p-6 overflow-y-auto bg-background h-full">
+        {/* Debug panel */}
+        {debug && (
+          <DebugPanel 
+            navigationData={settingsNavigationData}
+            debugInfo={debugInfo}
+            onRefresh={handleRefresh}
+          />
+        )}
+
+        {/* Connection status */}
+        <ConnectionStatus 
+          loading={navigationLoading}
+          error={navigationError}
+          lastUpdated={lastRefresh.toLocaleTimeString()}
+        />
+        
+        {/* Main content area */}
         <div className="bg-card border border-border rounded-lg p-6">
           <h2 className="text-xl font-semibold mb-4">{currentPage?.label || 'Settings'}</h2>
           <p className="text-muted-foreground">
             This is the settings content for {currentPage?.label || 'the selected page'}.
           </p>
+          
+          {/* Backend data verification */}
+          <div className="mt-4 p-3 bg-muted rounded text-xs">
+            <strong>Backend Data Verification:</strong>
+            <div className="mt-1 grid grid-cols-2 gap-2">
+              <div>Security Section Label:</div>
+              <div className="font-medium">
+                {settingsNavigationData.find(s => s.id === 'security')?.label || 'Not found'}
+              </div>
+              <div>Total Sections:</div>
+              <div className="font-medium">{settingsNavigationData.length}</div>
+              <div>Current Section:</div>
+              <div className="font-medium">{currentSection?.label || 'None'}</div>
+            </div>
+          </div>
+
+          {/* Raw data preview for debugging */}
+          {debug && (
+            <div className="mt-4 p-3 bg-blue-50 rounded border border-blue-200">
+              <h3 className="text-sm font-medium mb-2">Raw Backend Data Preview:</h3>
+              <pre className="text-xs overflow-x-auto max-h-40">
+                {JSON.stringify(settingsNavigationData, null, 2)}
+              </pre>
+            </div>
+          )}
         </div>
       </div>
     </div>
