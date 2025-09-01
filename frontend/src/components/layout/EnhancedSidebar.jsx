@@ -1,8 +1,16 @@
 /**
- * EnhancedSidebar.jsx
+ * EnhancedSidebar.jsx - COMPLETE UPDATED VERSION
  * 
  * Enhanced sidebar component following shadcn sidebar-08 design patterns.
- * Features collapsible navigation, nested items, search functionality, and user profile section.
+ * Features collapsible navigation, nested items, search functionality, user profile section,
+ * and DYNAMIC NAVIGATION CONTEXTS for seamless settings integration.
+ * 
+ * NEW FEATURES:
+ * - Dynamic navigation context switching (main vs settings)
+ * - Hierarchical settings navigation with bold section headers
+ * - Context-aware search functionality
+ * - Automatic section expansion for settings
+ * - Smooth transitions between navigation contexts
  * 
  * Key Features:
  * - Collapsible/expandable sidebar
@@ -11,6 +19,7 @@
  * - Responsive design for mobile devices
  * - Dark/light theme support
  * - User profile section
+ * - Dynamic context switching
  * 
  * Dependencies:
  * - React
@@ -20,15 +29,12 @@
  * Props:
  * - items: Array of navigation items
  * - pageTitle: Title to display in sidebar header
- * - collapsed: Boolean to control collapsed state
+ * - isOpen: Boolean to control sidebar open/closed state
  * - onToggle: Function to handle sidebar toggle
  * - activePageId: Currently active page ID
- * - onPageSelect: Function to handle page selection
- * 
- * How to Use:
- * 1. Import the component: import EnhancedSidebar from './EnhancedSidebar'
- * 2. Pass navigation items and required props
- * 3. Handle page selection and toggle events in parent component
+ * - onItemSelect: Function to handle page selection
+ * - navigationContext: 'main' | 'settings' - determines navigation style
+ * - onSettingsItemSelect: Function to handle settings page selection
  */
 import React, { useState } from 'react';
 import {
@@ -50,11 +56,18 @@ const EnhancedSidebar = ({
   wsConnected = false,
   lastUpdate = null,
   theme = 'light',
-  connectionStats = null
+  connectionStats = null,
+  // NEW PROPS for dynamic navigation
+  navigationContext = 'main', // 'main' | 'settings'
+  onSettingsItemSelect
 }) => {
-  const [expandedItems, setExpandedItems] = useState(new Set());
+  const [expandedItems, setExpandedItems] = useState(new Set(['general'])); // Default expand General section
   const [searchQuery, setSearchQuery] = useState('');
 
+  // =============================================================================
+  // NAVIGATION LOGIC
+  // =============================================================================
+  
   const toggleExpanded = (itemId) => {
     const newExpanded = new Set(expandedItems);
     if (newExpanded.has(itemId)) {
@@ -66,13 +79,26 @@ const EnhancedSidebar = ({
   };
 
   const handleItemClick = (item) => {
-    if (item.type === 'section' && item.children) {
-      toggleExpanded(item.id);
+    if (navigationContext === 'settings') {
+      if (item.type === 'section' && item.children) {
+        toggleExpanded(item.id);
+      } else if (item.type === 'page') {
+        onSettingsItemSelect?.(item.id);
+      }
     } else {
-      onItemSelect?.(item.id);
+      // Main navigation logic
+      if (item.type === 'section' && item.children) {
+        toggleExpanded(item.id);
+      } else {
+        onItemSelect?.(item.id);
+      }
     }
   };
 
+  // =============================================================================
+  // SEARCH FILTERING
+  // =============================================================================
+  
   const filteredItems = items.filter(item =>
     item.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (item.children && item.children.some(child =>
@@ -80,19 +106,76 @@ const EnhancedSidebar = ({
     ))
   );
 
+  // =============================================================================
+  // NAVIGATION ITEM COMPONENTS
+  // =============================================================================
+  
   const NavItem = ({ item, level = 0 }) => {
     const isExpanded = expandedItems.has(item.id);
     const isActive = activePageId === item.id;
     const hasChildren = item.children && item.children.length > 0;
     const Icon = item.icon;
 
+    // SETTINGS SECTION STYLING (Bold headers for sections)
+    if (navigationContext === 'settings' && item.type === 'section') {
+      return (
+        <div>
+          <button
+            onClick={() => handleItemClick(item)}
+            className={`
+              w-full flex items-center gap-3 px-3 py-3 text-xs font-bold rounded-lg transition-all duration-200
+              ${!isOpen ? 'justify-center px-2' : ''}
+              text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground
+              uppercase tracking-wider
+              group
+            `}
+            title={!isOpen ? item.label : undefined}
+          >
+            {Icon && (
+              <Icon className={`
+                ${!isOpen ? 'h-5 w-5' : 'h-4 w-4'} 
+                flex-shrink-0 transition-colors
+                text-sidebar-foreground/70 group-hover:text-sidebar-foreground
+              `} />
+            )}
+            
+            {isOpen && (
+              <>
+                <span className="flex-1 text-left truncate">{item.label}</span>
+                {hasChildren && (
+                  <div className="flex-shrink-0">
+                    {isExpanded ? (
+                      <ChevronDown className="h-3 w-3 transition-transform" />
+                    ) : (
+                      <ChevronRight className="h-3 w-3 transition-transform" />
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </button>
+
+          {/* SETTINGS CHILDREN - Clean indented styling */}
+          {hasChildren && isExpanded && isOpen && (
+            <div className="mt-1 space-y-1">
+              {item.children.map((child) => (
+                <NavItem key={child.id} item={child} level={level + 1} />
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // REGULAR NAVIGATION ITEM (Main nav or settings pages)
     return (
       <div>
         <button
           onClick={() => handleItemClick(item)}
           className={`
             w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200
-            ${level > 0 ? 'ml-6 pl-6' : ''}
+            ${navigationContext === 'settings' && level > 0 ? 'ml-6 pl-4' : ''}
+            ${level > 0 && navigationContext !== 'settings' ? 'ml-6 pl-6' : ''}
             ${isActive 
               ? 'bg-sidebar-accent text-sidebar-accent-foreground border-l-2 border-sidebar-primary' 
               : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
@@ -113,7 +196,7 @@ const EnhancedSidebar = ({
           {isOpen && (
             <>
               <span className="flex-1 text-left truncate">{item.label}</span>
-              {hasChildren && (
+              {hasChildren && navigationContext !== 'settings' && (
                 <div className="flex-shrink-0">
                   {isExpanded ? (
                     <ChevronDown className="h-4 w-4 transition-transform" />
@@ -126,7 +209,8 @@ const EnhancedSidebar = ({
           )}
         </button>
 
-        {hasChildren && isExpanded && isOpen && (
+        {/* MAIN NAVIGATION CHILDREN */}
+        {hasChildren && isExpanded && isOpen && navigationContext !== 'settings' && (
           <div className="mt-1 space-y-1 relative">
             <div className="absolute left-6 top-0 bottom-0 w-px bg-sidebar-border"></div>
             {item.children.map((child) => (
@@ -138,6 +222,10 @@ const EnhancedSidebar = ({
     );
   };
 
+  // =============================================================================
+  // MAIN RENDER
+  // =============================================================================
+  
   return (
     <>
       {/* Mobile overlay */}
@@ -157,13 +245,15 @@ const EnhancedSidebar = ({
         flex flex-col h-screen
       `}>
         
-        {/* Header */}
+        {/* Header with Dynamic Title */}
         <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
           {isOpen ? (
             <>
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 bg-sidebar-primary rounded-lg flex items-center justify-center">
-                  <span className="text-sidebar-primary-foreground font-bold text-sm">T</span>
+                  <span className="text-sidebar-primary-foreground font-bold text-sm">
+                    {navigationContext === 'settings' ? 'S' : 'T'}
+                  </span>
                 </div>
                 <span className="font-semibold text-sidebar-foreground">{pageTitle}</span>
               </div>
@@ -185,14 +275,18 @@ const EnhancedSidebar = ({
           )}
         </div>
 
-        {/* Search */}
+        {/* Search with Context-Aware Placeholder */}
         {isOpen && (
           <div className="p-4 border-b border-sidebar-border">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-sidebar-foreground/50" />
               <input
                 type="text"
-                placeholder="Search navigation..."
+                placeholder={
+                  navigationContext === 'settings' 
+                    ? "Search settings..." 
+                    : "Search navigation..."
+                }
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 text-sm bg-sidebar-accent border border-sidebar-border rounded-lg
@@ -204,7 +298,7 @@ const EnhancedSidebar = ({
         )}
 
         {/* Navigation */}
-        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
           {filteredItems.length > 0 ? (
             filteredItems.map((item) => (
               <NavItem key={item.id} item={item} />
@@ -220,13 +314,22 @@ const EnhancedSidebar = ({
           )}
         </nav>
 
-        {/* WebSocket Status */}
-        {isOpen && wsConnected && lastUpdate && (
+        {/* Context-Aware Status Display */}
+        {isOpen && (
           <div className="px-4 py-2 border-t border-sidebar-border">
-            <div className="flex items-center gap-2 text-xs text-sidebar-foreground/50">
-              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-              <span>Updated {new Date(lastUpdate).toLocaleTimeString()}</span>
-            </div>
+            {navigationContext === 'settings' ? (
+              <div className="flex items-center gap-2 text-xs text-sidebar-foreground/50">
+                <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                <span>Settings Mode</span>
+              </div>
+            ) : (
+              wsConnected && lastUpdate && (
+                <div className="flex items-center gap-2 text-xs text-sidebar-foreground/50">
+                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                  <span>Updated {new Date(lastUpdate).toLocaleTimeString()}</span>
+                </div>
+              )
+            )}
           </div>
         )}
 
@@ -238,13 +341,13 @@ const EnhancedSidebar = ({
             </div>
             {isOpen && (
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-sidebar-foreground">John Doe</p>
-                <p className="text-xs text-sidebar-foreground/70">john@thalyx.com</p>
+                <p className="text-sm font-medium text-sidebar-foreground">Nikos</p>
+                <p className="text-xs text-sidebar-foreground/70">nikos@thalyx.com</p>
               </div>
             )}
             {!isOpen && (
               <div className="absolute left-20 bottom-4 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-                John Doe
+                Nikos
               </div>
             )}
           </div>

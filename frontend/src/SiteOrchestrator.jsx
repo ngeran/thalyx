@@ -1,86 +1,53 @@
 /**
- * Enhanced SiteOrchestrator Component
+ * SiteOrchestrator.jsx - COMPLETE REVISED VERSION
  * 
  * @description
- * Advanced site orchestrator that leverages the modern GlobalSiteNavigation component
- * with integrated WebSocket status, real-time updates, and enhanced user experience.
- * This component now provides a cleaner separation of concerns with dedicated
- * navigation management and improved responsive design.
- * Now integrates GlobalSiteNavigation for enhanced nav features, with WebSocket status
- * moved there for centralized control.
+ * Advanced site orchestrator that manages navigation between main content and settings.
+ * Properly connects EnhancedSidebar and SettingsPage components with shared state management.
  * 
  * Key Enhancements:
- * - Integration with modern GlobalSiteNavigation component
- * - Enhanced WebSocket status monitoring with visual indicators (moved to nav)
- * - Improved responsive design with better mobile experience
- * - Real-time navigation updates with smooth transitions
- * - Advanced notification system with categorization
- * - Theme support with dark/light mode switching using yellow theme from shadcn
- * - Enhanced error handling and fallback mechanisms
- * - Performance optimizations with memoization
- * - Accessibility improvements with ARIA labels
+ * - Fixed settings navigation state management
+ * - Proper connection between sidebar and settings page
+ * - Context-aware navigation with seamless transitions
+ * - Maintains all existing WebSocket and theme functionality
  * 
  * @dependencies
- * - React (useState, useEffect, useMemo, useCallback hooks): State and lifecycle management
- * - React Router (BrowserRouter, Routes, Route, Link): Page routing (BrowserRouter is now in main.jsx)
- * - Lucide React icons: UI iconography
- * - GlobalSiteNavigation component: Enhanced navigation with WebSocket status
- * - EnhancedSidebar component: Sidebar with real-time updates
- * - useNavigation hook: Enhanced navigation data management
- * - useWebSocketContext hook: Real-time connectivity and updates
- * - navigationProcessor utilities: Data processing and transformation
- * - useTheme hook: Theme management with yellow theme from shadcn
- * 
- * @new-features
- * - Seamless WebSocket status integration in navigation bar
- * - Real-time theme switching with persistent preferences
- * - Advanced notification management with auto-dismiss
- * - Intelligent loading states with skeleton screens
- * - Enhanced error recovery with retry mechanisms
- * - Mobile-first responsive design patterns
- * - Keyboard navigation support with shortcuts
- * - Visual gap between navigation and main content for improved UI clarity
- * - Yellow theme implementation following shadcn design system
- * 
- * @how-to-use
- * 1. Wrap in WebSocketProvider for real-time features:
- *    ```jsx
- *    <WebSocketProvider>
- *      <SiteOrchestrator />
- *    </WebSocketProvider>
- *    ```
- * 
- * 2. Configure theme persistence in localStorage:
- *    ```jsx
- *    <SiteOrchestrator 
- *      defaultTheme="light"
- *      persistTheme={true}
- *    />
- *    ```
- * 
- * 3. Enable advanced features:
- *    ```jsx
- *    <SiteOrchestrator 
- *      enableSearch={true}
- *      enableNotifications={true}
- *      enableRealTimeUpdates={true}
- *      showWebSocketStatus={true}
- *    />
- *    ```
- * 
- * 4. Add additional pages:
- *    - Create a React component for the new page, e.g., `ReportsPage.jsx`
- *    - Import it into this file
- *    - Add a `<Route path="/reports" element={<ReportsPage />} />` inside `Routes`
- *    - Add an entry in your `navigationData` or static nav sections for the new page
+ * - React (useState, useEffect, useMemo, useCallback hooks)
+ * - React Router (Routes, Route)
+ * - Lucide React icons
+ * - GlobalSiteNavigation component
+ * - EnhancedSidebar component
+ * - useNavigation hook
+ * - useWebSocketContext hook
+ * - useTheme hook
+ * - navigationProcessor utilities
  */
 
 // =============================================================================
 // IMPORTS AND DEPENDENCIES
 // =============================================================================
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { Routes, Route, useNavigate, useLocation } from "react-router-dom"; // Removed BrowserRouter, added useNavigate, useLocation
-import { Home, Loader2, AlertTriangle, RefreshCw } from "lucide-react";
+import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
+import { 
+  Home, 
+  Loader2, 
+  AlertTriangle, 
+  RefreshCw,
+  Settings,
+  User,
+  Shield,
+  Network,
+  Database,
+  Palette,
+  Bell,
+  Monitor,
+  Lock,
+  Users,
+  Activity,
+  Globe,
+  BarChart,
+  X
+} from "lucide-react";
 
 // Components
 import GlobalSiteNavigation from "./components/navigation/GlobalSiteNavigation.jsx";
@@ -90,28 +57,82 @@ import EnhancedSidebar from "./components/layout/EnhancedSidebar.jsx";
 import { useNavigation } from "./hooks/useNavigation";
 import { useWebSocketContext } from "./contexts/WebSocketContext";
 import { ThemeProvider, useTheme } from './hooks/useTheme';
-import { processNavigationData, flattenNavigationForTopNav, getSidebarItems } from "./utils/navigationProcessor.jsx"; // Corrected path to .jsx
+import { processNavigationData, flattenNavigationForTopNav, getSidebarItems } from "./utils/navigationProcessor";
+
+// Pages
+import SettingsPage from "./pages/SettingsPage";
+import DashboardPage from "./pages/DashboardPage";
+import InventoryPage from "./pages/InventoryPage";
+import ReportsPage from "./pages/ReportsPage";
 
 // =============================================================================
-// NAVIGATION PAGES (Updated Import Paths)
+// SETTINGS NAVIGATION DATA
 // =============================================================================
-import SettingsPage from "./pages/SettingsPage.jsx";
-import DashboardPage from "./pages/DashboardPage.jsx";
-import FileUploaderPage from "./pages/FileUploaderPage.jsx";
-import InventoryPage from "./pages/InventoryPage.jsx";
-import ReportsPage from "./pages/ReportsPage.jsx";
+const SETTINGS_NAVIGATION = [
+  {
+    id: 'general',
+    label: 'General',
+    icon: Settings,
+    type: 'section',
+    children: [
+      { id: 'profile', label: 'Profile', icon: User, type: 'page' },
+      { id: 'preferences', label: 'Preferences', icon: Monitor, type: 'page' },
+      { id: 'notifications', label: 'Notifications', icon: Bell, type: 'page' }
+    ]
+  },
+  {
+    id: 'security',
+    label: 'Security',
+    icon: Shield,
+    type: 'section',
+    children: [
+      { id: 'authentication', label: 'Authentication', icon: Lock, type: 'page' },
+      { id: 'permissions', label: 'Permissions', icon: Users, type: 'page' }
+    ]
+  },
+  {
+    id: 'network',
+    label: 'Network',
+    icon: Network,
+    type: 'section',
+    children: [
+      { id: 'inventory', label: 'Device Inventory', icon: Database, type: 'page' },
+      { id: 'monitoring', label: 'Monitoring', icon: Activity, type: 'page' },
+      { id: 'topology', label: 'Network Topology', icon: Globe, type: 'page' }
+    ]
+  },
+  {
+    id: 'appearance',
+    label: 'Appearance',
+    icon: Palette,
+    type: 'section',
+    children: [
+      { id: 'theme', label: 'Theme Settings', icon: Palette, type: 'page' }
+    ]
+  }
+];
 
 // =============================================================================
 // MAIN COMPONENT
 // =============================================================================
 const SiteOrchestrator = () => {
   const { theme } = useTheme();
-  const navigate = useNavigate();   // Initialize useNavigate hook
-  const location = useLocation();   // Initialize useLocation hook
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  // State
-  const [activePageId, setActivePageId] = useState("dashboard"); // default to dashboard
+  // =============================================================================
+  // STATE MANAGEMENT
+  // =============================================================================
+  
+  // Main navigation state
+  const [activePageId, setActivePageId] = useState("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  
+  // Settings navigation state
+  const [settingsActivePageId, setSettingsActivePageId] = useState("profile");
+  const [isInSettingsContext, setIsInSettingsContext] = useState(false);
+
+  // User state
   const [currentUser] = useState({
     name: 'Nikos',
     email: 'nikos@example.com',
@@ -119,185 +140,224 @@ const SiteOrchestrator = () => {
     avatar: null
   });
 
+  // =============================================================================
+  // HOOKS AND CONTEXTS
+  // =============================================================================
+  
   // Navigation hook
-  const { navigationData: httpNavigationData, loading, error, refresh: refreshNavigation, breadcrumbs, currentSection } = useNavigation({
+  const { 
+    navigationData: httpNavigationData, 
+    loading, 
+    error, 
+    refresh: refreshNavigation, 
+    breadcrumbs, 
+    currentSection 
+  } = useNavigation({
     enableRealTime: true,
     enableBreadcrumbs: true,
     cacheEnabled: true,
-    currentPath: location.pathname // Use useLocation to get the current path for navigation hook
+    currentPath: window.location.pathname
   });
 
   // WebSocket context
-  const { isConnected: wsConnected = false, lastUpdate = null, notifications = [], connectionStats = null } = useWebSocketContext() || {};
+  const { 
+    isConnected: wsConnected = false, 
+    lastUpdate = null, 
+    notifications = [], 
+    connectionStats = null 
+  } = useWebSocketContext() || {};
 
-// =============================================================================
-// Sync activePageId with URL path
-// =============================================================================
-useEffect(() => {
-  const currentPath = location.pathname;
-
-  const findActiveId = (processedNavSections) => {
-      // Add a robust check here!
-      if (!processedNavSections || processedNavSections.length === 0) {
-          return "dashboard"; // Default if no navigation sections are available
-      }
-
-      // Flatten all items and their children for a comprehensive search
-      const allNavItems = processedNavSections.flatMap(section => {
-          // Ensure section.items is an array before flatMapping
-          if (!section.items) return [];
-          return section.items.flatMap(item => [item, ...(item.children || [])]);
-      });
-
-      // Add a check for allNavItems being empty after flattening
-      if (allNavItems.length === 0) {
-          return "dashboard"; // Default if no items are found after flattening
-      }
-
-      // Find the most specific match first (longest path)
-      let bestMatchId = "dashboard"; // Default if no specific match
-      let bestMatchLength = 0;
-
-      for (const item of allNavItems) {
-          if (currentPath === item.url) {
-              bestMatchId = item.id;
-              break; // Exact match, prioritize and stop
-          } else if (currentPath.startsWith(item.url) && item.url !== "/" && item.url.length > bestMatchLength) {
-              // For paths like /devices/groups when item.url is /devices, find the longest match
-              bestMatchId = item.id;
-              bestMatchLength = item.url.length;
-          } else if (currentPath === "/" && item.url === "/") {
-              bestMatchId = item.id;
-              // Don't break here if you want to allow more specific matches later
-              // or if a different 'home' item might be more relevant
-          }
-      }
-      return bestMatchId;
-  };
-
-  // Only run this logic if navigation data has been loaded and is not null/undefined
-  if (!loading && httpNavigationData) {
-    const processed = processNavigationData(httpNavigationData);
-    // Ensure processed.sections exists before passing to findActiveId
-    if (processed && processed.sections) {
-      setActivePageId(findActiveId(processed.sections));
-    } else {
-      // Fallback if processed data is unexpected
-      console.warn("Navigation data processing resulted in unexpected structure:", processed);
-      setActivePageId("dashboard");
-    }
-  } else if (!loading && !httpNavigationData) {
-      // Handle case where data is loaded but is empty (e.g., API returned no nav data)
-      setActivePageId("dashboard");
-  }
-}, [location.pathname, loading, httpNavigationData, processNavigationData]); // Add processNavigationData to dependencies
-
-
-
-
-  // Memoized navigation data
   // =============================================================================
-  const navigationData = useMemo(() => (wsConnected && httpNavigationData ? httpNavigationData : httpNavigationData), [wsConnected, httpNavigationData]);
-  const processedNavigation = useMemo(() => processNavigationData(navigationData), [navigationData]);
-  const topNavItems = useMemo(() => flattenNavigationForTopNav(processedNavigation), [processedNavigation]);
-  const sidebarItems = useMemo(() => getSidebarItems(processedNavigation, activePageId), [processedNavigation, activePageId]);
+  // EFFECTS FOR ROUTE SYNCHRONIZATION
+  // =============================================================================
+  
+  // Sync active page with current route
+  useEffect(() => {
+    const path = location.pathname;
+    if (path === '/settings' || path.startsWith('/settings/')) {
+      setIsInSettingsContext(true);
+      // Extract settings page from path if available
+      const settingsPage = path.split('/')[2] || 'profile';
+      setSettingsActivePageId(settingsPage);
+    } else {
+      setIsInSettingsContext(false);
+      // Set main page based on route
+      const page = path.replace('/', '') || 'dashboard';
+      setActivePageId(page);
+    }
+  }, [location.pathname]);
+
+  // Responsive sidebar handling
+  useEffect(() => {
+    const handleResize = () => setSidebarOpen(window.innerWidth >= 1024);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // =============================================================================
+  // NAVIGATION HANDLERS
+  // =============================================================================
+  
+  // Handle main page navigation
+  const handleMainPageChange = useCallback((pageId) => {
+    if (pageId === 'settings') {
+      // Enter settings context
+      navigate('/settings');
+      setIsInSettingsContext(true);
+      setSettingsActivePageId('profile');
+    } else {
+      // Regular page navigation
+      navigate(`/${pageId}`);
+      setIsInSettingsContext(false);
+      setActivePageId(pageId);
+    }
+  }, [navigate]);
+
+  // Handle settings page navigation
+  const handleSettingsPageChange = useCallback((settingsPageId) => {
+    setSettingsActivePageId(settingsPageId);
+    navigate(`/settings/${settingsPageId}`);
+  }, [navigate]);
+
+  // Exit settings context
+  const handleExitSettings = useCallback(() => {
+    navigate('/dashboard');
+    setIsInSettingsContext(false);
+    setActivePageId('dashboard');
+  }, [navigate]);
 
   const toggleSidebar = useCallback(() => setSidebarOpen(!sidebarOpen), [sidebarOpen]);
 
-  // Handle page change: update internal state for highlighting and navigate using react-router-dom
-  const handlePageChange = useCallback((id, url) => {
-    setActivePageId(id); // Keep the internal state for highlighting
-    navigate(url);      // Navigate to the new URL using react-router-dom
-  }, [navigate]);
+  // =============================================================================
+  // MEMOIZED NAVIGATION DATA
+  // =============================================================================
+  
+  // Determine which navigation to show in sidebar
+  const sidebarItems = useMemo(() => {
+    if (isInSettingsContext) {
+      // Show settings navigation when in settings context
+      return SETTINGS_NAVIGATION;
+    } else {
+      // Show main navigation for other pages
+      const navigationData = wsConnected && httpNavigationData ? httpNavigationData : httpNavigationData;
+      if (!navigationData) {
+        // Fallback main navigation
+        return [
+          { id: 'dashboard', label: 'Dashboard', icon: Home, type: 'page' },
+          { id: 'inventory', label: 'Inventory', icon: Database, type: 'page' },
+          { id: 'reports', label: 'Reports', icon: BarChart, type: 'page' },
+          { id: 'settings', label: 'Settings', icon: Settings, type: 'page' }
+        ];
+      }
+      const processedNavigation = processNavigationData(navigationData);
+      return getSidebarItems(processedNavigation, activePageId);
+    }
+  }, [isInSettingsContext, activePageId, wsConnected, httpNavigationData]);
+
+  // Memoized navigation data for top nav
+  const navigationData = useMemo(() => (wsConnected && httpNavigationData ? httpNavigationData : httpNavigationData), [wsConnected, httpNavigationData]);
+  const processedNavigation = useMemo(() => processNavigationData(navigationData), [navigationData]);
+  const topNavItems = useMemo(() => flattenNavigationForTopNav(processedNavigation), [processedNavigation]);
 
   // =============================================================================
-  // Render main content routes
+  // SIDEBAR PROPS CONFIGURATION
+  // =============================================================================
+  
+  const sidebarProps = useMemo(() => {
+    return {
+      items: sidebarItems,
+      pageTitle: isInSettingsContext ? "Settings" : "Thalyx",
+      isOpen: sidebarOpen,
+      onToggle: toggleSidebar,
+      activePageId: isInSettingsContext ? settingsActivePageId : activePageId,
+      onItemSelect: isInSettingsContext ? handleSettingsPageChange : handleMainPageChange,
+      wsConnected,
+      lastUpdate,
+      theme,
+      connectionStats,
+      // Dynamic navigation props
+      navigationContext: isInSettingsContext ? 'settings' : 'main',
+      onSettingsItemSelect: handleSettingsPageChange
+    };
+  }, [
+    sidebarItems,
+    isInSettingsContext,
+    settingsActivePageId,
+    activePageId,
+    sidebarOpen,
+    toggleSidebar,
+    handleMainPageChange,
+    handleSettingsPageChange,
+    wsConnected,
+    lastUpdate,
+    theme,
+    connectionStats
+  ]);
+
+  // =============================================================================
+  // RENDER MAIN CONTENT ROUTES
   // =============================================================================
   return (
-    // BrowserRouter is now handled in main.jsx, so it's removed here
     <div className={`flex flex-col h-screen bg-background text-foreground ${theme}`}>
       {/* Navigation */}
       <GlobalSiteNavigation
         user={currentUser}
         currentPage={activePageId}
-        onPageChange={handlePageChange} // Pass the new handler to GlobalSiteNavigation
-        navigationData={topNavItems} // Pass the flattened data for top navigation
+        onPageChange={handleMainPageChange}
+        navigationData={topNavItems}
+        showSettingsExit={isInSettingsContext}
+        onExitSettings={handleExitSettings}
       />
 
       {/* Content */}
       <div className="flex flex-1 overflow-hidden">
-        <EnhancedSidebar 
-          items={sidebarItems}
-          pageTitle="Thalyx"
-          isOpen={sidebarOpen}
-          onToggle={toggleSidebar}
-          activePageId={activePageId}
-          onItemSelect={(id, url) => handlePageChange(id, url)} // Sidebar also uses the new handler
-          wsConnected={wsConnected}
-          lastUpdate={lastUpdate}
-          theme={theme}
-          connectionStats={connectionStats}
-        />
+        {/* Enhanced Sidebar with Dynamic Navigation */}
+        <EnhancedSidebar {...sidebarProps} />
 
         <main className="flex-1 overflow-auto p-6 mt-4">
+          {/* Loading and Error States */}
           {loading && <Loader2 className="animate-spin h-12 w-12 mx-auto" />}
           {error && (
             <div className="text-center text-red-500">
               <AlertTriangle className="h-12 w-12 mx-auto mb-4" />
               <p>Navigation Error: {error}</p>
-              <button onClick={refreshNavigation} className="px-4 py-2 bg-primary text-primary-foreground rounded-lg">
+              <button 
+                onClick={refreshNavigation} 
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg"
+              >
                 <RefreshCw className="inline h-4 w-4 mr-2" /> Retry
               </button>
             </div>
           )}
+          
+          {/* Routes */}
           <Routes>
-            {/* Core routes as explicitly defined */}
             <Route path="/" element={<DashboardPage />} />
             <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
-
-            {/* Dynamically add routes for other top-level navigation items
-                This mapping assumes a direct correlation between navigation item IDs and page components.
-                You'll need to expand the switch statement for all your YAML 'id's.
-            */}
-            {topNavItems.map(item => {
-              // Exclude already explicitly defined routes to avoid duplicates or conflicts
-              if (['/', '/dashboard', '/settings'].includes(item.url)) return null;
-
-              let PageComponent = null;
-              switch (item.id) {
-                  case "home": PageComponent = DashboardPage; break; // 'home' could point to Dashboard
-                  case "devices": PageComponent = InventoryPage; break; // 'devices' maps to InventoryPage
-                  case "lab": PageComponent = FileUploaderPage; break; // 'lab' maps to FileUploaderPage (example)
-                  // Add more cases here for other top-level navigation items from your YAML
-                  // case "reports": PageComponent = ReportsPage; break; // If reports is a top-level page itself
-                  default: PageComponent = DashboardPage; // Fallback to Dashboard or a dedicated 404 page
-              }
-              return PageComponent ? <Route key={item.id} path={item.url} element={<PageComponent />} /> : null;
-            })}
-
-            {/* Routes for children of main navigation items (if they map to separate pages) */}
-            {/* These need to be explicitly defined or handled with a more advanced dynamic routing system */}
-
-            {/* Dashboard Children */}
-            <Route path="/dashboard/analytics" element={<DashboardPage />} /> {/* Assuming analytics is part of DashboardPage or a sub-component */}
-            <Route path="/dashboard/reports" element={<ReportsPage />} />
-
-            {/* Devices Children */}
-            <Route path="/devices/groups" element={<InventoryPage />} /> {/* Example: children of devices link to InventoryPage */}
-            <Route path="/devices/monitoring" element={<InventoryPage />} />
-
-            {/* Lab Children */}
-            <Route path="/lab/experiments" element={<FileUploaderPage />} /> {/* Example: children of lab link to FileUploaderPage */}
-            <Route path="/lab/protocols" element={<FileUploaderPage />} />
-            <Route path="/lab/samples" element={<FileUploaderPage />} />
-
-            {/* Settings Children */}
-            <Route path="/settings/user" element={<SettingsPage />} />
-            <Route path="/settings/system" element={<SettingsPage />} />
-
-            {/* Add a catch-all route for 404 if needed */}
-            {/* <Route path="*" element={<NotFoundPage />} /> */}
+            <Route path="/inventory" element={<InventoryPage />} />
+            <Route path="/reports" element={<ReportsPage />} />
+            {/* Settings routes with dynamic content */}
+            <Route 
+              path="/settings" 
+              element={
+                <SettingsPage 
+                  activeSettingsPage={settingsActivePageId}
+                  onSettingsPageChange={handleSettingsPageChange}
+                  onExitSettings={handleExitSettings}
+                />
+              } 
+            />
+            <Route 
+              path="/settings/:pageId" 
+              element={
+                <SettingsPage 
+                  activeSettingsPage={settingsActivePageId}
+                  onSettingsPageChange={handleSettingsPageChange}
+                  onExitSettings={handleExitSettings}
+                />
+              } 
+            />
           </Routes>
         </main>
       </div>
