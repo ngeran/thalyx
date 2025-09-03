@@ -1,359 +1,146 @@
 /**
- * EnhancedSidebar.jsx - COMPLETE UPDATED VERSION
- * 
- * Enhanced sidebar component following shadcn sidebar-08 design patterns.
- * Features collapsible navigation, nested items, search functionality, user profile section,
- * and DYNAMIC NAVIGATION CONTEXTS for seamless settings integration.
- * 
- * NEW FEATURES:
- * - Dynamic navigation context switching (main vs settings)
- * - Hierarchical settings navigation with bold section headers
- * - Context-aware search functionality
- * - Automatic section expansion for settings
- * - Smooth transitions between navigation contexts
- * 
- * Key Features:
- * - Collapsible/expandable sidebar
- * - Nested navigation items with expand/collapse
- * - Search functionality with filtering
- * - Responsive design for mobile devices
- * - Dark/light theme support
- * - User profile section
- * - Dynamic context switching
- * 
- * Dependencies:
- * - React
- * - Lucide React (for icons)
- * - Tailwind CSS
- * 
- * Props:
- * - items: Array of navigation items
- * - pageTitle: Title to display in sidebar header
- * - isOpen: Boolean to control sidebar open/closed state
- * - onToggle: Function to handle sidebar toggle
- * - activePageId: Currently active page ID
- * - onItemSelect: Function to handle page selection
- * - navigationContext: 'main' | 'settings' - determines navigation style
- * - onSettingsItemSelect: Function to handle settings page selection
+ * @file EnhancedSidebar.jsx
+ * @description Generic sidebar component that receives navigation items from context.
+ *              Supports dynamic navigation, loading states, and item selection.
+ *
+ * @key-features
+ * - Dynamic navigation items from NavigationContext
+ * - Support for nested navigation structures
+ * - Loading and error states
+ * - Responsive design
+ * - Expandable/collapsible sections
+ *
+ * @dependencies
+ * - @/core/contexts/NavigationContext: For navigation items and state
+ * - lucide-react: For icons
+ *
+ * @usage-guide
+ * ```jsx
+ * <EnhancedSidebar
+ *   items={sidebarItems}
+ *   activePageId={activePageId}
+ *   onItemSelect={handleItemSelect}
+ *   loading={pageLoading}
+ * />
+ * ```
  */
-import React, { useState } from 'react';
-import {
-  ChevronRight,
-  ChevronDown,
-  Search,
-  User,
-  Menu,
-  X
-} from 'lucide-react';
 
-const EnhancedSidebar = ({ 
-  items = [], 
-  pageTitle = "Thalyx", 
-  isOpen = true, 
-  onToggle,
-  activePageId = "dashboard",
+import React from 'react';
+import { useNavigation } from '../../core/contexts/NavigationContext';
+import { Loader2 } from 'lucide-react';
+
+const EnhancedSidebar = ({
+  items = [],
+  activePageId,
   onItemSelect,
-  wsConnected = false,
-  lastUpdate = null,
-  theme = 'light',
-  connectionStats = null,
-  // NEW PROPS for dynamic navigation
-  navigationContext = 'main', // 'main' | 'settings'
-  onSettingsItemSelect
+  loading = false,
+  className = ''
 }) => {
-  const [expandedItems, setExpandedItems] = useState(new Set(['general'])); // Default expand General section
-  const [searchQuery, setSearchQuery] = useState('');
+  const { setActiveSidebarItem } = useNavigation();
 
-  // =============================================================================
-  // NAVIGATION LOGIC
-  // =============================================================================
-  
-  const toggleExpanded = (itemId) => {
-    const newExpanded = new Set(expandedItems);
-    if (newExpanded.has(itemId)) {
-      newExpanded.delete(itemId);
-    } else {
-      newExpanded.add(itemId);
-    }
-    setExpandedItems(newExpanded);
-  };
+  // ---------------------------------------------------------------------------
+  // HANDLERS
+  // ---------------------------------------------------------------------------
 
   const handleItemClick = (item) => {
-    if (navigationContext === 'settings') {
-      if (item.type === 'section' && item.children) {
-        toggleExpanded(item.id);
-      } else if (item.type === 'page') {
-        onSettingsItemSelect?.(item.id);
-      }
-    } else {
-      // Main navigation logic
-      if (item.type === 'section' && item.children) {
-        toggleExpanded(item.id);
-      } else {
-        onItemSelect?.(item.id);
+    if (item.type === 'page' && item.id) {
+      setActiveSidebarItem(item.id);
+      if (onItemSelect) {
+        onItemSelect(item.id, item);
       }
     }
   };
 
-  // =============================================================================
-  // SEARCH FILTERING
-  // =============================================================================
-  
-  const filteredItems = items.filter(item =>
-    item.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (item.children && item.children.some(child =>
-      child.label.toLowerCase().includes(searchQuery.toLowerCase())
-    ))
-  );
+  // ---------------------------------------------------------------------------
+  // RENDER FUNCTIONS
+  // ---------------------------------------------------------------------------
 
-  // =============================================================================
-  // NAVIGATION ITEM COMPONENTS
-  // =============================================================================
-  
-  const NavItem = ({ item, level = 0 }) => {
-    const isExpanded = expandedItems.has(item.id);
-    const isActive = activePageId === item.id;
-    const hasChildren = item.children && item.children.length > 0;
+  const renderNavigationItem = (item) => {
     const Icon = item.icon;
 
-    // SETTINGS SECTION STYLING (Bold headers for sections)
-    if (navigationContext === 'settings' && item.type === 'section') {
-      return (
-        <div>
-          <button
-            onClick={() => handleItemClick(item)}
-            className={`
-              w-full flex items-center gap-3 px-3 py-3 text-xs font-bold rounded-lg transition-all duration-200
-              ${!isOpen ? 'justify-center px-2' : ''}
-              text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground
-              uppercase tracking-wider
-              group
-            `}
-            title={!isOpen ? item.label : undefined}
-          >
-            {Icon && (
-              <Icon className={`
-                ${!isOpen ? 'h-5 w-5' : 'h-4 w-4'} 
-                flex-shrink-0 transition-colors
-                text-sidebar-foreground/70 group-hover:text-sidebar-foreground
-              `} />
-            )}
-            
-            {isOpen && (
-              <>
-                <span className="flex-1 text-left truncate">{item.label}</span>
-                {hasChildren && (
-                  <div className="flex-shrink-0">
-                    {isExpanded ? (
-                      <ChevronDown className="h-3 w-3 transition-transform" />
-                    ) : (
-                      <ChevronRight className="h-3 w-3 transition-transform" />
-                    )}
-                  </div>
-                )}
-              </>
-            )}
-          </button>
+    if (item.type === 'divider') {
+      return <div key={item.id} className="border-t border-gray-200 my-2" />;
+    }
 
-          {/* SETTINGS CHILDREN - Clean indented styling */}
-          {hasChildren && isExpanded && isOpen && (
-            <div className="mt-1 space-y-1">
-              {item.children.map((child) => (
-                <NavItem key={child.id} item={child} level={level + 1} />
-              ))}
+    if (item.type === 'section') {
+      return (
+        <div key={item.id} className="mb-4">
+          <div className="flex items-center px-3 py-2 text-sm font-medium text-gray-700">
+            {Icon && <Icon className="h-4 w-4 mr-2" />}
+            {item.label}
+          </div>
+          {item.children && (
+            <div className="ml-4 mt-1">
+              {item.children.map(renderNavigationItem)}
             </div>
           )}
         </div>
       );
     }
 
-    // REGULAR NAVIGATION ITEM (Main nav or settings pages)
-    return (
-      <div>
+    if (item.type === 'page') {
+      const isActive = activePageId === item.id;
+
+      return (
         <button
+          key={item.id}
           onClick={() => handleItemClick(item)}
           className={`
-            w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200
-            ${navigationContext === 'settings' && level > 0 ? 'ml-6 pl-4' : ''}
-            ${level > 0 && navigationContext !== 'settings' ? 'ml-6 pl-6' : ''}
-            ${isActive 
-              ? 'bg-sidebar-accent text-sidebar-accent-foreground border-l-2 border-sidebar-primary' 
-              : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+            w-full flex items-center px-3 py-2 text-sm rounded-lg transition-colors
+            ${isActive
+              ? 'bg-primary text-white'
+              : 'text-gray-700 hover:bg-gray-100'
             }
-            ${!isOpen ? 'justify-center px-2' : ''}
-            group
           `}
-          title={!isOpen ? item.label : undefined}
+          title={item.description}
         >
-          {Icon && (
-            <Icon className={`
-              ${!isOpen ? 'h-5 w-5' : 'h-4 w-4'} 
-              flex-shrink-0 transition-colors
-              ${isActive ? 'text-sidebar-primary' : 'text-sidebar-foreground/70 group-hover:text-sidebar-foreground'}
-            `} />
-          )}
-          
-          {isOpen && (
-            <>
-              <span className="flex-1 text-left truncate">{item.label}</span>
-              {hasChildren && navigationContext !== 'settings' && (
-                <div className="flex-shrink-0">
-                  {isExpanded ? (
-                    <ChevronDown className="h-4 w-4 transition-transform" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4 transition-transform" />
-                  )}
-                </div>
-              )}
-            </>
+          {Icon && <Icon className="h-4 w-4 mr-2" />}
+          <span className="truncate">{item.label}</span>
+          {item.badge && (
+            <span className={`ml-auto px-2 py-0.5 text-xs rounded-full ${
+              item.badge.variant === 'primary' ? 'bg-blue-100 text-blue-800' :
+              item.badge.variant === 'destructive' ? 'bg-red-100 text-red-800' :
+              'bg-gray-100 text-gray-800'
+            }`}>
+              {item.badge.value}
+            </span>
           )}
         </button>
+      );
+    }
 
-        {/* MAIN NAVIGATION CHILDREN */}
-        {hasChildren && isExpanded && isOpen && navigationContext !== 'settings' && (
-          <div className="mt-1 space-y-1 relative">
-            <div className="absolute left-6 top-0 bottom-0 w-px bg-sidebar-border"></div>
-            {item.children.map((child) => (
-              <NavItem key={child.id} item={child} level={level + 1} />
-            ))}
-          </div>
-        )}
-      </div>
-    );
+    return null;
   };
 
-  // =============================================================================
-  // MAIN RENDER
-  // =============================================================================
-  
-  return (
-    <>
-      {/* Mobile overlay */}
-      {isOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-          onClick={onToggle}
-        />
-      )}
-      
-      {/* Sidebar */}
-      <div className={`
-        fixed lg:static inset-y-0 left-0 z-50 
-        ${isOpen ? 'w-64' : 'w-16'} 
-        bg-sidebar border-r border-sidebar-border
-        transition-all duration-300 ease-in-out
-        flex flex-col h-screen
-      `}>
-        
-        {/* Header with Dynamic Title */}
-        <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
-          {isOpen ? (
-            <>
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-sidebar-primary rounded-lg flex items-center justify-center">
-                  <span className="text-sidebar-primary-foreground font-bold text-sm">
-                    {navigationContext === 'settings' ? 'S' : 'T'}
-                  </span>
-                </div>
-                <span className="font-semibold text-sidebar-foreground">{pageTitle}</span>
-              </div>
-              <button
-                onClick={onToggle}
-                className="p-1.5 rounded-md hover:bg-sidebar-accent transition-colors"
-              >
-                <X className="h-4 w-4 text-sidebar-foreground" />
-              </button>
-            </>
-          ) : (
-            <button
-              onClick={onToggle}
-              className="p-1.5 rounded-md hover:bg-sidebar-accent transition-colors mx-auto"
-              title="Expand sidebar"
-            >
-              <Menu className="h-4 w-4 text-sidebar-foreground" />
-            </button>
-          )}
-        </div>
+  // ---------------------------------------------------------------------------
+  // RENDER
+  // ---------------------------------------------------------------------------
 
-        {/* Search with Context-Aware Placeholder */}
-        {isOpen && (
-          <div className="p-4 border-b border-sidebar-border">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-sidebar-foreground/50" />
-              <input
-                type="text"
-                placeholder={
-                  navigationContext === 'settings' 
-                    ? "Search settings..." 
-                    : "Search navigation..."
-                }
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 text-sm bg-sidebar-accent border border-sidebar-border rounded-lg
-                         focus:ring-2 focus:ring-sidebar-ring focus:border-transparent
-                         text-sidebar-foreground placeholder:text-sidebar-foreground/50"
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Navigation */}
-        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
-          {filteredItems.length > 0 ? (
-            filteredItems.map((item) => (
-              <NavItem key={item.id} item={item} />
-            ))
-          ) : (
-            isOpen && searchQuery && (
-              <div className="text-center py-8">
-                <Search className="h-8 w-8 text-sidebar-foreground/30 mx-auto mb-3" />
-                <p className="text-sm text-sidebar-foreground/70">No results found</p>
-                <p className="text-xs text-sidebar-foreground/50 mt-1">Try a different search term</p>
-              </div>
-            )
-          )}
-        </nav>
-
-        {/* Context-Aware Status Display */}
-        {isOpen && (
-          <div className="px-4 py-2 border-t border-sidebar-border">
-            {navigationContext === 'settings' ? (
-              <div className="flex items-center gap-2 text-xs text-sidebar-foreground/50">
-                <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
-                <span>Settings Mode</span>
-              </div>
-            ) : (
-              wsConnected && lastUpdate && (
-                <div className="flex items-center gap-2 text-xs text-sidebar-foreground/50">
-                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                  <span>Updated {new Date(lastUpdate).toLocaleTimeString()}</span>
-                </div>
-              )
-            )}
-          </div>
-        )}
-
-        {/* User Profile */}
-        <div className="border-t border-sidebar-border p-4">
-          <div className={`flex items-center ${isOpen ? 'gap-3' : 'justify-center'} group`}>
-            <div className="w-8 h-8 bg-sidebar-primary rounded-full flex items-center justify-center">
-              <User className="h-4 w-4 text-sidebar-primary-foreground" />
-            </div>
-            {isOpen && (
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-sidebar-foreground">Nikos</p>
-                <p className="text-xs text-sidebar-foreground/70">nikos@thalyx.com</p>
-              </div>
-            )}
-            {!isOpen && (
-              <div className="absolute left-20 bottom-4 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-                Nikos
-              </div>
-            )}
-          </div>
+  if (loading) {
+    return (
+      <div className={`w-64 bg-white border-r border-gray-200 p-4 ${className}`}>
+        <div className="flex items-center justify-center h-32">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          <span className="ml-2 text-sm text-gray-600">Loading navigation...</span>
         </div>
       </div>
-    </>
+    );
+  }
+
+  return (
+    <div className={`w-64 bg-white border-r border-gray-200 overflow-y-auto ${className}`}>
+      <div className="p-4">
+        <nav className="space-y-1">
+          {items.length > 0 ? (
+            items.map(renderNavigationItem)
+          ) : (
+            <div className="text-center py-8 text-sm text-gray-500">
+              No navigation items available
+            </div>
+          )}
+        </nav>
+      </div>
+    </div>
   );
 };
 
