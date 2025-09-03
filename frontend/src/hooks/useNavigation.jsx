@@ -1,10 +1,12 @@
 /**
  * Enhanced useNavigation Hook
- *
+ * =============================================================================
+ * @description
  * Advanced React hook for fetching and managing navigation data with enhanced
  * error handling, caching, real-time updates, and WebSocket integration.
  * Provides a comprehensive navigation state management solution.
- *
+ * 
+ * -----------------------------------------------------------------------------
  * Key Features:
  * - Automatic data fetching with health check validation
  * - Intelligent caching with configurable TTL
@@ -14,29 +16,34 @@
  * - Icon mapping with fallback support
  * - Navigation breadcrumb generation
  * - Route validation and access control
- *
+ * - NO HARDCODED FALLBACK DATA - pure backend-driven
+ * 
+ * -----------------------------------------------------------------------------
  * Dependencies:
  * - React (useState, useEffect, useCallback, useMemo hooks)
  * - Lucide React icons for navigation items
  * - WebSocket context for real-time updates
  * - Backend API endpoints for navigation data
- *
+ * 
+ * -----------------------------------------------------------------------------
  * API Endpoints:
  * - Health Check: GET http://127.0.0.1:3001/health
  * - Navigation Data: GET http://127.0.0.1:3001/api/yaml/navigation
  * - Navigation Updates: WebSocket subscription to 'navigation:update'
- *
+ * 
+ * -----------------------------------------------------------------------------
  * Environment Configuration:
  * - REACT_APP_API_BASE_URL: Backend API base URL (default: http://127.0.0.1:3001)
  * - REACT_APP_CACHE_TTL: Navigation cache TTL in milliseconds (default: 300000)
- *
+ * 
+ * -----------------------------------------------------------------------------
  * Usage Examples:
- *
+ * 
  * Basic Usage:
  * ```jsx
  * const { navigationData, loading, error } = useNavigation();
  * ```
- *
+ * 
  * Advanced Usage with Options:
  * ```jsx
  * const {
@@ -52,7 +59,7 @@
  *   autoRefresh: 300000
  * });
  * ```
- *
+ * 
  * Integration with Navigation Bar:
  * ```jsx
  * function NavigationBar() {
@@ -160,23 +167,6 @@ const ICON_MAP = {
   fileUp: FileUp,
   barChart3: BarChart3,
   activity: BarChart3
-};
-
-/**
- * DEFAULT_NAVIGATION
- * fallback structure if API is unreachable
- */
-const DEFAULT_NAVIGATION = {
-  sections: [
-    {
-      id: 'main',
-      title: 'Main Navigation',
-      items: [
-        { id: 'home', title: 'Home', icon: 'home', path: '/' },
-        { id: 'dashboard', title: 'Dashboard', icon: 'dashboard', path: '/dashboard' }
-      ]
-    }
-  ]
 };
 
 // =============================================================================
@@ -471,10 +461,7 @@ export const useNavigation = (options = {}) => {
       setRetryCount(prev => prev + 1);
       setLoading(false);
 
-      // Use default fallback (processed to match structure)
-      const fallbackData = processNavigationData(DEFAULT_NAVIGATION);
-      setNavigationData(fallbackData);
-
+      // NO FALLBACK DATA - Pure backend-driven approach
       console.error('[useNavigation] Navigation data loading error:', err);
     }
   }, [fetchNavigationData, processNavigationData]);
@@ -558,8 +545,7 @@ export const useNavigation = (options = {}) => {
       if (hasActiveItem) return section;
     }
 
-    // default to first section if none active
-    return navigationData.sections[0];
+    return null;
   }, [navigationData]);
 
   // stats

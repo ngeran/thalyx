@@ -38,12 +38,6 @@
 use std::{net::SocketAddr, sync::Arc};
 
 // External crate imports
-use axum::{
-    extract::{Path, Query, State},
-    response::Json,
-    routing::get,
-    Router,
-};
 use tower_http::cors::CorsLayer;
 use tracing::{info, Level};
 
@@ -51,6 +45,7 @@ use tracing::{info, Level};
 mod models;
 mod services;
 mod api;
+mod routes;
 
 // Internal imports
 use services::{YamlService, WebSocketService};
@@ -103,33 +98,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // =========================================================================
-    // ROUTE CONFIGURATION
+    // APPLICATION CONFIGURATION
     // =========================================================================
     
-    info!("Configuring API routes...");
-    let app = Router::new()
-        // Health and monitoring endpoints
-        .route("/health", get(health_check))
-        
-        // YAML data management endpoints
-        .route("/api/yaml/:schema_name", get(api::handlers::get_yaml_by_schema))
-        .route("/api/yaml/:schema_name/validate", get(validate_yaml_data))
-        .route("/api/schemas", get(list_schemas))
-        
-        // Navigation configuration endpoints
-        .route("/api/navigation", get(api::navigation::get_navigation))
-        .route("/api/navigation/yaml", get(api::navigation::get_navigation_from_yaml))
-        
-        // SideBar Navigation Route
-        .route("/api/navigation/settings", get(api::navigation::get_settings_navigation))
-
-
-        .route("/api/reload", get(api::handlers::reload_schemas))
-        
-        // WebSocket endpoints
-        .merge(api::websocket::websocket_routes())
-        
-        // Add application state and CORS middleware
+    info!("Configuring application routes...");
+    let app = routes::create_routes()
         .with_state(state)
         .layer(CorsLayer::permissive());
 
@@ -147,38 +120,4 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     axum::serve(listener, app).await?;
     
     Ok(())
-}
-
-// =============================================================================
-// CORE API HANDLERS
-// =============================================================================
-
-/// Health check endpoint
-/// Returns "OK" if server is running correctly
-async fn health_check() -> &'static str {
-    "OK"
-}
-
-/// Validate YAML data against a specific schema
-/// 
-/// # Parameters
-/// - `schema_name`: Name of the schema to validate against
-/// - `file_path`: Optional path to YAML file (uses default if not provided)
-async fn validate_yaml_data(
-    Path(schema_name): Path<String>,
-    Query(params): Query<std::collections::HashMap<String, String>>,
-    State(state): State<AppState>,
-) -> models::ApiResult<Json<serde_json::Value>> {
-    let file_path = params.get("file").cloned();
-    let validation_result = state.yaml_service.validate_yaml_data(&schema_name, file_path.as_deref()).await?;
-    Ok(Json(validation_result))
-}
-
-/// List all available schemas
-/// Returns a JSON array of schema names
-async fn list_schemas(
-    State(state): State<AppState>,
-) -> models::ApiResult<Json<Vec<String>>> {
-    let schemas = state.yaml_service.list_available_schemas().await?;
-    Ok(Json(schemas))
 }

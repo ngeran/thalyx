@@ -51,7 +51,7 @@ const EnhancedSidebar = ({
   pageTitle = "Thalyx", 
   isOpen = true, 
   onToggle,
-  activePageId = "home",
+  activePageId = "dashboard",
   onItemSelect,
   wsConnected = false,
   lastUpdate = null,
