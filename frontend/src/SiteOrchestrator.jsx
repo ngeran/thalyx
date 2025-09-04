@@ -27,6 +27,11 @@
  * }
  * ```
  */
+/**
+ * @file SiteOrchestrator.jsx
+ * @description Main application orchestrator using the plugin-based architecture.
+ *              Coordinates page registration, routing, and navigation management.
+ */
 
 import React, { useMemo, useEffect } from 'react';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
@@ -49,8 +54,6 @@ import settingsConfig from './pages/settings/settings.config';
 import { useApiData } from "./hooks/useApiData";
 import { useWebSocketContext } from "./contexts/WebSocketContext";
 import { ThemeProvider, useTheme } from "./hooks/useTheme";
-
-
 
 // Register all pages
 pageRegistry
@@ -76,24 +79,24 @@ const SiteOrchestratorContent = () => {
   // EFFECTS
   // ---------------------------------------------------------------------------
 
-  // Sync URL with active page
+  // Sync navigation context with URL changes (but don't trigger navigation)
   useEffect(() => {
     const path = location.pathname.slice(1) || 'dashboard';
-    if (pageRegistry.hasPage(path)) {
+    if (pageRegistry.hasPage(path) && activePageId !== path) {
       navigateToPage(path);
     }
-  }, [location.pathname, navigateToPage]);
+  }, [location.pathname, navigateToPage, activePageId]);
 
   // ---------------------------------------------------------------------------
   // COMPUTED VALUES
   // ---------------------------------------------------------------------------
 
-  // Generate routes dynamically from registered pages
+  // Generate routes dynamically from registered pages - FIXED: Remove wildcards
   const routes = useMemo(() => {
     return pageRegistry.getAllPages().map(page => (
       <Route
         key={page.id}
-        path={`/${page.id}/*`}
+        path={`/${page.id}`}
         element={<page.component />}
       />
     ));
@@ -108,16 +111,24 @@ const SiteOrchestratorContent = () => {
   // HANDLERS
   // ---------------------------------------------------------------------------
 
+  // FIXED: Simplified navigation handler - let React Router handle the navigation
   const handlePageChange = (pageId) => {
     navigate(`/${pageId}`);
-    navigateToPage(pageId);
+    // navigateToPage will be called by the useEffect above when location changes
   };
 
   const handleSidebarItemSelect = (itemId) => {
-    // For now, we'll use the same handler
-    // In a real implementation, this would handle sidebar-specific navigation
+    // Handle sidebar navigation
+    navigate(`/${itemId}`);
     console.log('Sidebar item selected:', itemId);
   };
+
+  // ---------------------------------------------------------------------------
+  // DEBUG: Add some logging to help troubleshoot
+  // ---------------------------------------------------------------------------
+  console.log('Current location:', location.pathname);
+  console.log('Active page ID:', activePageId);
+  console.log('Available pages:', pageRegistry.getAllPages().map(p => p.id));
 
   // ---------------------------------------------------------------------------
   // RENDER
@@ -143,12 +154,29 @@ const SiteOrchestratorContent = () => {
 
         {/* Main Content */}
         <main className="flex-1 overflow-auto p-6">
-          <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            {routes}
-            {/* 404 Fallback */}
-            <Route path="*" element={<div>Page not found</div>} />
-          </Routes>
+          {pageLoading ? (
+            <div className="flex items-center justify-center h-full">
+              <div>Loading...</div>
+            </div>
+          ) : (
+            <Routes>
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              {routes}
+              {/* 404 Fallback */}
+              <Route path="*" element={
+                <div className="text-center py-8">
+                  <h2 className="text-2xl font-bold mb-4">Page not found</h2>
+                  <p>The page you're looking for doesn't exist.</p>
+                  <button 
+                    onClick={() => navigate('/dashboard')}
+                    className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+                  >
+                    Go to Dashboard
+                  </button>
+                </div>
+              } />
+            </Routes>
+          )}
         </main>
       </div>
     </div>
@@ -161,7 +189,7 @@ const SiteOrchestratorContent = () => {
 
 const SiteOrchestrator = () => {
   return (
-    <ThemeProvider> {/* Wrap with ThemeProvider */}
+    <ThemeProvider>
       <NavigationProvider>
         <SiteOrchestratorContent />
       </NavigationProvider>
